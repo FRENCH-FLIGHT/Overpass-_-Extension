@@ -1,5 +1,5 @@
 /**
- * UnlockAll v2.1 – background.js (Service Worker)
+ * Overpass v2.2.2 – background.js (Service Worker)
  *
  * Responsabilités :
  *   1. Génère et rotation du token d'authentification postMessage
@@ -22,7 +22,7 @@ function generateToken() {
 }
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
-  await chrome.storage.local.set({ __ua_token: generateToken() });
+  await chrome.storage.local.set({ __op_token: generateToken() });
   if (reason === 'install') {
     await chrome.storage.sync.set({
       ...FACTORY_DEFAULTS,
@@ -36,7 +36,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 
 // Regénère le token à chaque démarrage du navigateur
 chrome.runtime.onStartup.addListener(async () => {
-  await chrome.storage.local.set({ __ua_token: generateToken() });
+  await chrome.storage.local.set({ __op_token: generateToken() });
 });
 
 // ── Messages ─────────────────────────────────────────────────────
@@ -45,33 +45,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 
     case 'getFactoryDefaults':
       reply({ defaults: FACTORY_DEFAULTS });
-      return true;
-
-    // ─ Cookies ─
-    case 'cookies.getAll':
-      chrome.cookies.getAll(msg.details || {}, cookies => {
-        reply({ ok: true, cookies: cookies || [] });
-      });
-      return true;
-
-    case 'cookies.getAll.domain':
-      chrome.cookies.getAll({ domain: msg.domain }, cookies => {
-        reply({ ok: true, cookies: cookies || [] });
-      });
-      return true;
-
-    case 'cookies.set':
-      chrome.cookies.set(msg.details, cookie => {
-        if (chrome.runtime.lastError) reply({ ok: false, error: chrome.runtime.lastError.message });
-        else reply({ ok: true, cookie });
-      });
-      return true;
-
-    case 'cookies.remove':
-      chrome.cookies.remove(msg.details, () => {
-        if (chrome.runtime.lastError) reply({ ok: false, error: chrome.runtime.lastError.message });
-        else reply({ ok: true });
-      });
       return true;
 
     default:
