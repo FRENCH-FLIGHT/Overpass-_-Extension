@@ -1,5 +1,5 @@
 /**
- * UnlockAll v2.1 – content.js  (ISOLATED world, run_at: document_start)
+ * Overpass v2.2.0 – content.js  (ISOLATED world, run_at: document_start)
  *
  * Rôle : pont sécurisé entre chrome.storage/runtime et inject.js (MAIN world).
  *
@@ -8,16 +8,15 @@
  *   de la page — et inclus dans chaque message envoyé à inject.js.
  *   Inject.js le valide et rejette tout message sans token valide.
  *
- * Proxy cookies :
- *   inject.js demande les opérations cookies via postMessage ;
- *   on les exécute ici (monde isolé → accès chrome.cookies via background)
- *   et on renvoie la réponse à inject.js.
+ * Note : les panels Cookie et Resource ont été retirés de l'extension (v2.2.0).
+ * Le proxy cookies (background.js) et les handlers XHR/fetch (inject.js)
+ * ont également été supprimés.
  */
 (function () {
   'use strict';
 
-  const BUS_IN  = '__ua_c2p__';  // content  → inject
-  const BUS_OUT = '__ua_p2c__';  // inject   → content
+  const BUS_IN  = '__op_c2p__';  // content  → inject
+  const BUS_OUT = '__op_p2c__';  // inject   → content
 
   const DEFAULTS = {
     contextmenu: true, selectstart: true, clipboard: true, keyboard: true,
@@ -37,38 +36,7 @@
     window.postMessage({ __ch: BUS_IN, __t: token, action, payload }, window.location.origin || '*');
   }
 
-  // ── Proxy cookie : demandes venant de inject.js ─────────────────
-  // inject.js ne peut pas appeler chrome.cookies directement (MAIN world).
-  // Il envoie une demande via postMessage, on l'intercepte ici et on
-  // contacte le background qui a la permission "cookies".
-  function handleCookieRequest(payload) {
-    const { op, url, name, domain, details } = payload || {};
-
-    const bgAction = {
-      getAll: 'cookies.getAll',
-      set   : 'cookies.set',
-      remove: 'cookies.remove',
-    }[op];
-
-    if (!bgAction) return;
-
-    let bgMsg = { action: bgAction };
-    if (op === 'getAll')  bgMsg.details = { url };
-    if (op === 'set')     bgMsg.details = details;
-    if (op === 'remove')  bgMsg.details = { url, name };
-
-    chrome.runtime.sendMessage(bgMsg, resp => {
-      if (chrome.runtime.lastError) return;
-      // Réponse pour le panel cookie flottant dans inject.js
-      window.postMessage({
-        __ch    : BUS_OUT,
-        action  : 'cookiesResponse',
-        payload : resp?.cookies || (resp?.cookie ? [resp.cookie] : []),
-      }, window.location.origin || '*');
-    });
-  }
-
-  // ── Écoute des messages de inject.js → forward popup/background ─
+  // ── Écoute des messages de inject.js ───────────────────────────
   function setupMessageListener() {
     window.addEventListener('message', e => {
       if (!e.data || e.data.__ch !== BUS_OUT) return;
@@ -81,23 +49,20 @@
         return;
       }
 
-      // Demande de proxy cookies depuis inject.js
-      if (action === 'cookiesRequest') {
-        handleCookieRequest(payload);
+      // Overlay list → popup
+      if (action === 'overlayList' || action === 'state') {
+        try { chrome.runtime.sendMessage({ action, payload }); } catch (_) {}
         return;
       }
-
-      // Tout le reste (overlayList, resourceList, pickerDone…) → popup
-      try { chrome.runtime.sendMessage({ action, payload }); } catch (_) {}
     });
   }
 
   // ── Chargement des settings depuis storage ──────────────────────
   function loadAndApply() {
-    chrome.storage.sync.get({ ...DEFAULTS, customScripts: '[]' }, raw => {
+    chrome.storage.sync.get({ ...DEFAULTS, customScripts: '[]', language: 'fr' }, raw => {
       let scripts = [];
       try { scripts = JSON.parse(raw.customScripts ?? '[]'); } catch (_) {}
-      current = { ...DEFAULTS, ...raw, customScripts: scripts };
+      current = { ...DEFAULTS, ...raw, customScripts: scripts, lang: raw.language || 'fr' };
       if (ready)  toInject('init', current);
       else        pending = current;
     });
@@ -110,6 +75,7 @@
       case 'updateSettings': {
         const scripts = msg.settings.customScripts ?? current.customScripts;
         current = { ...current, ...msg.settings, customScripts: scripts };
+        if (msg.settings.language !== undefined) current.lang = msg.settings.language;
         chrome.storage.sync.set({ ...current, customScripts: JSON.stringify(scripts) });
         toInject('update', current);
         reply({ ok: true });
@@ -120,27 +86,21 @@
         reply({ settings: current });
         break;
 
-      // Actions directes → inject.js
       case 'removeOverlays':     toInject('removeOverlays');                     reply({ ok: true }); break;
       case 'restoreOverlay':     toInject('restoreOverlay',  { id: msg.id });    reply({ ok: true }); break;
       case 'restoreAllOverlays': toInject('restoreAllOverlays');                 reply({ ok: true }); break;
       case 'activatePicker':     toInject('activatePicker');                     reply({ ok: true }); break;
       case 'cancelPicker':       toInject('cancelPicker');                       reply({ ok: true }); break;
-      case 'openCookiePanel':    toInject('openCookiePanel');                    reply({ ok: true }); break;
-      case 'openResourcePanel':  toInject('openResourcePanel');                  reply({ ok: true }); break;
-      case 'blockResource':      toInject('blockResource',   { url: msg.url });  reply({ ok: true }); break;
-      case 'unblockResource':    toInject('unblockResource', { url: msg.url });  reply({ ok: true }); break;
-      case 'clearResources':     toInject('clearResources');                     reply({ ok: true }); break;
       case 'getState':           toInject('getState');                           reply({ ok: true }); break;
       case 'ping':               reply({ pong: true }); break;
     }
-    return true; // async reply
+    return true;
   });
 
   // ── Initialisation ──────────────────────────────────────────────
   async function init() {
-    const { __ua_token } = await chrome.storage.local.get('__ua_token');
-    token = __ua_token || null;
+    const { __op_token } = await chrome.storage.local.get('__op_token');
+    token = __op_token || null;
 
     setupMessageListener();
     loadAndApply();
