@@ -2,8 +2,6 @@
 
 **Overpass** is a professional browser extension that restores your control over web pages. It bypasses artificial restrictions, giving you back the freedom to interact with any content the way you choose.
 
-\---
-
 ## 🌟 Key Features
 
 ### 🖱️ Mouse \& Content Control
