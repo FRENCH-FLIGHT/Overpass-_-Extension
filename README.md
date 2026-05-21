@@ -1,139 +1,155 @@
-# 🔓 UnlockAll – Page Freedom
+# 🚀 Overpass – Page Freedom
 
-**UnlockAll** is a professional-grade browser extension that restores user agency on the web. It bypasses artificial restrictions, gives you full visibility into what a page is doing, and lets you take control.
+**Overpass** is a professional browser extension that restores your control over web pages. It bypasses artificial restrictions, giving you back the freedom to interact with any content the way you choose.
 
----
+\---
 
-## ✨ Features
+## 🌟 Key Features
 
-### 🛡️ Protection layers
-- **Right-click restoration** — re-enables native context menus
-- **Text selection** — removes `user-select:none` and `selectstart` blocks
-- **Copy / Cut / Paste** — restores clipboard shortcuts everywhere
-- **Keyboard shortcuts** — prevents pages from hijacking Ctrl+A, F5, etc.
-- **Drag & Drop** — re-enables dragging of images, files and links
-- **Scroll unlock** — removes `overflow:hidden` scroll locks
-- **Print bypass** — allows Ctrl+P on restricted pages
-- **Cursor restore** — forces cursor display when hidden by CSS
-- **Focus anti-steal** — blocks automatic `focus()` / `blur()` calls
-- **Tab visibility spoof** — keeps `document.hidden = false` permanently
-- **Pointer events** — neutralises CSS overlays blocking clicks
-- **Auto overlay removal** — detects and hides paywalls / modals automatically
+### 🖱️ Mouse \& Content Control
 
-### 🔬 Advanced
-- **DevTools detection bypass** — multiple vectors covered (timing, resize, debugger injection, Proxy traps, Error.stack fingerprinting)
-- **Console protection** — prevents `console.clear()` and toString getter tricks
-- **Custom user scripts** — run your own JavaScript at `document_start`, `document_end`, or `document_idle`
+* **Right-Click Restoration** — re-enables the native context menu on sites that disable it
+* **Text Selection** — allows you to highlight and copy text anywhere
+* **Visible Cursor** — forces your cursor to stay visible even when hidden by scripts
+* **Click-Through Overlays** — makes content clickable under blocking popup windows
 
-### 🍪 Cookie Manager (floating panel)
-- List, search, filter all cookies for the current site
-- Create, edit, delete individual cookies
-- Full form: name, value, domain, path, expiry, Secure, HttpOnly, Session flags
-- Export cookies to JSON / Import from JSON file
-- Drag the panel anywhere on screen
+### 📋 Clipboard \& Keyboard
 
-### 📡 Resource & Script Viewer (floating panel)
-- Real-time interception of **XHR**, **Fetch**, **Script**, **CSS**, and **Image** loads
-- Filter by type or search by URL
-- View the content of any intercepted resource
-- Block future requests to a specific URL
-- Download or patch (replace) resource content
-- Drag the panel anywhere on screen
+* **Smart Clipboard** — restores Copy, Cut \& Paste (Ctrl+C/X/V) everywhere
+* **Keyboard Shortcuts** — prevents websites from hijacking your browser shortcuts
+* **Focus Protection** — stops sites from stealing your input focus automatically
 
-### 🌍 UI
-- 4-language support: 🇫🇷 French · 🇬🇧 English · 🇪🇸 Spanish · 🇩🇪 German
-- Dark mode & Light mode
-- Save custom default settings / restore factory defaults
-- 5-tab popup: Protections · Overlays · Cookies · Scripts · Settings
+### 📜 Page Behaviour
 
----
+* **Drag \& Drop** — re-enables dragging of images, links and files
+* **Scroll Unlock** — removes artificial scroll locks set by pages
+* **Print Freedom** — allows printing or saving as PDF on restricted pages
+* **Always Visible** — keeps the site from detecting you've switched tabs
+* **Auto Overlay Removal** — automatically detects and hides paywalls and blocking modals
+
+### ⚙️ Advanced
+
+* **DevTools Protection** — prevents sites from detecting when you open developer tools
+* **Console Guard** — stops pages from clearing your console history
+* **Custom Scripts** — run your own JavaScript automatically on any page, at the timing you choose
+
+
+
+\---
 
 ## 🚀 Installation
 
-### Chrome / Edge (Developer Mode)
-1. Download and extract this repository as a ZIP.
-2. Go to `chrome://extensions/`.
-3. Enable **Developer Mode** (top-right toggle).
-4. Click **Load unpacked** and select the extension folder.
+### ✅ Easy install — Chrome Extension Package (.crx)
+
+1. Download the latest **`overpass.crx`** from the [Releases](../../releases) page
+2. Go to `chrome://extensions/`
+3. Enable **Developer Mode** (toggle, top-right)
+4. **Drag and drop** the `.crx` file onto the extensions page
+5. Click **Add extension** in the confirmation dialog
+
+> \*\*Note:\*\* If Chrome blocks the drag-and-drop, use the manual install below.
+
+### 🛠️ Manual install (unpacked)
+
+1. Download and extract the ZIP from the [Releases](../../releases) page
+2. Go to `chrome://extensions/`
+3. Enable **Developer Mode**
+4. Click **Load unpacked** and select the extracted folder
 
 ### Firefox
-> Requires Firefox 128+ (Manifest V3 with `world: "MAIN"`)
-1. Go to `about:debugging` → **This Firefox**.
-2. Click **Load Temporary Add-on** → select `manifest.json`.
 
----
+1. Go to `about:debugging` → **This Firefox**
+2. Click **Load Temporary Add-on** → select `manifest.json`
 
-## 🛠️ Architecture
+> Firefox support requires version 128+
 
-```
-unlockall-extension/
-├── manifest.json        MV3 manifest — permissions, content scripts
-├── inject.js            MAIN world — all bypass layers + floating panels
-├── content.js           Isolated world — secure bridge + cookie proxy
-├── background.js        Service worker — token generation + cookie API
-├── popup.html           Extension popup UI
-├── popup.css            Popup styles (dark + light themes)
-├── popup.js             Popup logic — i18n, settings, cookie/script/overlay management
-└── icons/               Extension icons (16, 48, 128 px)
-```
+\---
 
-### Communication flow
-```
-popup.js
-  │  chrome.tabs.sendMessage()
-  ▼
-content.js  (isolated world)
-  │  window.postMessage({ token })   ← authenticated
-  ▼
-inject.js   (MAIN world)
-  │  applies overrides to page context
-  ▼
-Page
-```
+## 🖥️ Interface
 
----
+The popup is organised into **4 tabs**:
 
-## ⚠️ Known limitations
-- **Browser internal pages** (`chrome://`, `about:`) cannot be modified.
-- **Server-side paywalls** (content never sent) cannot be recovered.
-- **Strict CSP** sites may limit some features.
-- DevTools bypass is marked experimental — advanced timing-based detections may still work on some sites.
+|Tab|What it does|
+|-|-|
+|**Protections**|Toggle each bypass on or off individually|
+|**Overlays**|View and restore elements hidden by the extension|
+|**Scripts**|Create, edit and manage custom JavaScript snippets|
+|**Settings**|Language, theme, save your own defaults, factory reset|
 
----
+**Quick actions** in the toolbar:
+
+* **Enable All / Disable All** — one-click toggle of all protections
+* **Pick** — click any element on the page to hide it (Escape to cancel)
+
+\---
+
+## ⚠️ Known Limitations
+
+* Browser internal pages (`chrome://`, `about:`) cannot be modified
+* Content gated server-side (never sent to your browser) cannot be recovered
+* DevTools bypass is marked experimental — some very advanced detection methods may still work
+
+\---
 
 ## 📜 License
 
-MIT License — intended for personal use and accessibility purposes.  
-Users are responsible for complying with the terms of service of the websites they visit.
+MIT License — for personal use and accessibility purposes.  
+Users are responsible for complying with the terms of service of websites they visit.
 
----
+\---
 
 ## 📋 Changelog
 
+### v2.2.2 — Current
+
+* **Stability \& effectiveness improvements** — additional bypass coverage without site breakage
+* Selection change events now intercepted alongside select-start
+* Scroll bypass extended to `scrollTo`/`scrollBy` programmatic calls (sites that force-scroll back to top)
+* CSS live-lock: `insertRule` patched surgically — only global `\*`/`body`/`html` rules re-adding `user-select:none` or `cursor:none` are blocked
+* SPA navigation fallback: URL polling at 1 Hz covers frameworks that bypass History API
+* Security: postMessage payload capped at 64 KB
+* Performance: inline-handler selector string cached at module level
+
+### v2.2.1
+
+* **Stability improvements** — overlay auto-remove now preserves legitimate modals containing forms or interactive elements
+* **Performance** — CSS injection cached (no DOM update if unchanged), overlay detection deferred to browser idle time
+* **Visibility bypass** — `document.hasFocus()` now also spoofed
+
+### v2.2.0
+
+* **Major performance overhaul** — resolved critical memory leak causing 3GB+ RAM usage and browser crashes on media-heavy sites
+* **Removed Cookie Manager and Resource Viewer panels** — replaced by native browser DevTools (F12 → Application / Network); this eliminates the need to intercept all network requests, dramatically reducing memory and CPU usage
+* **Bug fixes** — resolved multiple bypass interactions that caused breakage on complex web pages
+* **Improved reliability** of all bypass layers
+
 ### v2.1.0
-- **Cookie Manager** — full floating panel with create/edit/delete/export/import, powered by the `chrome.cookies` API
-- **Resource & Script Viewer** — real-time XHR/Fetch/Script/CSS/Image tracker with block, view, download, and patch capabilities
-- **Floating panels** — implemented in Shadow DOM (`mode: closed`) so they are invisible to page scripts
-- **Security: postMessage token authentication** — a rotating secret token (generated in the service worker, inaccessible to page scripts) is required to authenticate every message sent to `inject.js`; messages with missing or invalid tokens are silently dropped
-- **Security: payload whitelist** — incoming settings payloads are validated against a strict whitelist of allowed keys before `Object.assign` is called
-- **Optimisation: debounced MutationObserver** — mutations are buffered for 120 ms and processed in a single batch; newly added nodes are handled individually instead of triggering a full `querySelectorAll` on each mutation
-- **Stealth: nativeToString()** — all patched prototype methods expose `function name() { [native code] }` to prevent fingerprinting via `Function.prototype.toString`
-- **Stealth: Symbol guard** — the internal guard property uses a non-enumerable Symbol, invisible to `Object.keys()` and `for...in`
-- **Stealth: Shadow DOM closed panels** — floating UI panels are attached as `mode: "closed"` shadow roots; `document.querySelector` and `document.querySelectorAll` cannot reach their internals
-- **Stealth: Error.stack filtering** — extension file paths are stripped from stack traces to prevent detection via error monitoring
-- **Stealth: Proxy trap neutralisation** — the `console.id` getter trick (used by some DevTools detectors) is neutralised
-- **DevTools bypass: expanded** — now covers Function/eval debugger injection, outerWidth/outerHeight spoofing, alert filtering, performance.now jitter, fast-interval throttling, Error.stack fingerprinting, and Proxy-based console detection
-- **Cancel picker** — the overlay picker mode can now be cancelled via the button or Escape key
-- **Cookie proxy** — `content.js` acts as a transparent proxy between `inject.js` (MAIN world, no chrome API access) and `background.js` (has `cookies` permission)
+
+* **Cookie Manager** — full floating panel with create / edit / delete / export / import
+* **Resource \& Script Viewer** — real-time XHR, Fetch, Script, CSS and Image tracker with block, view and download
+* **Floating panels in Shadow DOM** — panels are injected directly into the page and are invisible to detection scripts
+* **Cancel overlay picker** — press Escape or click the button again to cancel pick mode
+* **Drag \& Drop fix** — complete rewrite of the drag \& drop bypass, now works on all sites
+* **Security: authenticated message bus** — all internal messages require a rotating secret token; forged messages are silently ignored
+* **Security: XSS-safe popup** — all user-controlled data is rendered via `textContent`, never `innerHTML`
+* **Performance: debounced MutationObserver** — mutations are batched over 120 ms instead of firing on every DOM change
+* **SPA navigation support** — bypasses are automatically re-applied after client-side route changes (React, Vue, Angular…)
+* **CSS live-lock** — prevents pages from re-injecting restrictive CSS rules via `insertRule`
+* **Periodic re-application** — a lightweight background sweep counters sites that restore restrictions on a timer
+* **4-language UI** — French, English, Spanish, German
+* **Light / Dark theme** — toggle in header or in Settings
+* **Save custom defaults** — save your preferred configuration and restore it anytime
+* **Factory reset** — restores the original extension configuration and removes all custom scripts
 
 ### v2.0.0
-- Multi-layer bypass engine (L1–L9)
-- `world: "MAIN"` injection for prototype-level overrides
-- Overlay manager with picker and restore list
-- Custom user scripts with 3 execution phases
-- 4-language i18n system
-- Dark / light theme
-- User-defined default settings + factory reset
+
+* Complete bypass engine rewrite (9 layers, Manifest V3, MAIN world injection)
+* Overlay manager with visual picker and restore list
+* Custom user scripts with 3 execution phases
+* i18n system (4 languages)
+* Dark / Light theme
+* User-defined default settings + factory reset
 
 ### v1.0.0
-- Initial release: right-click, text selection, clipboard, keyboard shortcuts, drag & drop, scroll, print, cursor, overlay removal
+
+* Initial release: right-click, text selection, clipboard, keyboard shortcuts, drag \& drop, scroll unlock, print, cursor restore, auto overlay removal
