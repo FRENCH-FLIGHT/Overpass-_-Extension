@@ -31,10 +31,6 @@
 * **Console Guard** — stops pages from clearing your console history
 * **Custom Scripts** — run your own JavaScript automatically on any page, at the timing you choose
 
-
-
-\---
-
 ## 🚀 Installation
 
 ### ✅ Easy install — Chrome Extension Package (.crx)
@@ -61,8 +57,6 @@
 
 > Firefox support requires version 128+
 
-\---
-
 ## 🖥️ Interface
 
 The popup is organised into **4 tabs**:
@@ -79,22 +73,16 @@ The popup is organised into **4 tabs**:
 * **Enable All / Disable All** — one-click toggle of all protections
 * **Pick** — click any element on the page to hide it (Escape to cancel)
 
-\---
-
 ## ⚠️ Known Limitations
 
 * Browser internal pages (`chrome://`, `about:`) cannot be modified
 * Content gated server-side (never sent to your browser) cannot be recovered
 * DevTools bypass is marked experimental — some very advanced detection methods may still work
 
-\---
-
 ## 📜 License
 
 MIT License — for personal use and accessibility purposes.  
 Users are responsible for complying with the terms of service of websites they visit.
-
-\---
 
 ## 📋 Changelog
 
