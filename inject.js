@@ -1,5 +1,5 @@
 /**
- * Overpass v2.2.2 – inject.js  (world:"MAIN", run_at:"document_start")
+ * Overpass v3.0.0 – inject.js  (world:"MAIN", run_at:"document_start")
  *
  * COUCHES DE BYPASS :
  *  L1  Event.prototype override        ← le plus profond, touche tout
@@ -25,12 +25,80 @@
  *  - patchScroll : scrollTo/scrollBy neutralisés quand S.scroll actif
  *  - patchInsertRule : CSS live-lock chirurgical (sélecteurs globaux seulement)
  *  - SPA URL polling 1 Hz en fallback des hooks history API
+ *
+ *  v2.2.3 (hardening sécurité) :
+ *  - lockPatches() : L1+L2 verrouillés non-writable/non-configurable
+ *    dès le bootstrap — impossible à écraser via affectation ou
+ *    Object.defineProperty, même depuis une iframe fraîche.
+ *  - patchStyleSetProperty() : bloque les inline style !important
+ *    adversariaux (user-select:none, cursor:none).
+ *  - patchAdoptedStyleSheets() : couvre CSSStyleSheet.replaceSync/replace
+ *    (vecteur adoptedStyleSheets) avec réinjection CSS défensive.
+ *
+ *  v2.2.4 (stabilité + discrétion) :
+ *  - BUGFIX CRITIQUE : L4 sentinels passive:false → passive:true — élimine
+ *    le jank scroll sur toutes les pages (le browser ne peut pas optimiser le
+ *    scroll si un listener non-passif existe, même s'il ne fait rien).
+ *  - BUGFIX CRITIQUE : lockPatches retire addEventListener/removeEventListener
+ *    du verrou — corrige la casse de zone.js/Angular, Vue et SDKs vidéo.
+ *  - lockPatches passe à un accesseur {get,set:noop,configurable:true} :
+ *    moins de fingerprint, toujours protection contre réaffectation simple.
+ *  - patchStyleSetProperty : comparaisons directes sans regex (chemin chaud).
+ *  - console.warn('[Overpass]') supprimé, attribut data-op retiré du DOM.
+ *  - Flags _patched évitent de re-patcher à chaque applyAll.
+ *  - patchSelection() : removeAllRanges/empty bloqués pendant selectionchange.
+ *
+ *  v2.2.5 (audit complet) :
+ *  - BUGFIX : hideOverlay utilisait el.dataset.uaOvId (attribut data-ua-ov-id
+ *    visible en DOM = fingerprint extension détectable). Remplacé par WeakMap.
+ *  - BUGFIX : _wmap L2 ignorait le flag capture → même wrapper pour bubble/capture,
+ *    removeEventListener pouvait rater. Clé composite (fn + capture) désormais.
+ *  - NOUVEAU : patchDesignMode() — document.designMode='on' contournait user-select.
+ *  - _sendOverlayList debouncé 50ms — évite N postMessages pour N overlays simultanés.
+ *  - validatePayload : vérification rapide keys.length avant JSON.stringify.
+ *  - hideOverlay appelle N.setProp directement (bypass notre propre patchStyleSetProperty).
+ *
+ *  v2.2.6 (zéro trace quand inactif) :
+ *  - teardown() : nettoyage complet quand toutes les features sont off
+ *    (L4 sentinels retirés, MutationObserver déconnecté, SPA interval nettoyé,
+ *    <style> retiré, addEventListener natif restauré, selectionchange retiré,
+ *    CSS prototypes restaurés, flags _patched réinitialisés).
+ *  - anyActive() : gate sur applyAll et bootstrap — aucun overhead si inactif.
+ *  - L4 sentinels différés : créés en mémoire, enregistrés/retirés dynamiquement.
+ *  - hookSPANavigation / selectionchange listener : références stockées pour teardown.
+ *  - Bootstrap : lockPatches() seul si tout désactivé (L1 transparent, aucune trace).
+ *
+ *  v2.2.7 (hardening + optimisations + furtivité) :
+ *  - BUGFIX : patchConsole ne restaurait jamais console.log sur désactivation.
+ *  - BUGFIX : _markUserActive listeners (pointerdown/keydown) jamais retirés
+ *    par teardown() → trace permanente même inactive. Maintenant conditionnels.
+ *  - BUGFIX : hookSPANavigation re-wrappait history.pushState/replaceState à
+ *    chaque réactivation après teardown (double wrapping). Flag _spaHooked.
+ *  - BUGFIX : patchVisibility ne restaurait jamais hidden/visibilityState.
+ *  - NOUVEAU : patchPrint() — window.matchMedia('print') intercepté pour
+ *    empêcher la détection d'impression par les sites paywallés.
+ *  - Flags sur patchFocus/patchScroll/patchVisibility/patchConsole —
+ *    évite toute ré-assignation inutile à chaque applyAll.
+ *  - teardown() complété : focus/scroll/visibility/console/matchMedia restaurés.
+ *
+ *  v2.2.8 (furtivité critique + bypass + perf) :
+ *  - STEALTH : nativeToStr passe à WeakMap + Function.prototype.toString patch unique.
+ *    Avant : fn.hasOwnProperty('toString') === true (fingerprint détectable).
+ *    Après : false, comme les vraies fonctions natives. Aucune own property visible.
+ *  - NOUVEAU : Selection.prototype.toString protégé — certains sites le surchargent
+ *    pour retourner '' et vider le texte copié malgré la sélection visible.
+ *  - BUGFIX : _debTimer et _ovlDebTimer non nettoyés dans teardown() → callbacks
+ *    flush/overlayList pouvaient encore se déclencher après désactivation.
+ *  - PERF : _ON_ENTRIES en cache module-level — Object.entries(ON) n'est plus
+ *    recréé à chaque appel de clearInlineHandlers.
+ *  - CORRECTIF : autoRemoveOverlays utilise N.setProp directement (évite l'auto-
+ *    interception par patchStyleSetProperty sur les valeurs 'auto').
  */
 (function () {
   'use strict';
 
   // ── Guard (Symbol non-énumérable, invisible à Object.keys) ──────
-  const _GUARD = Symbol('__ua');
+  const _GUARD = Symbol();
   if (window[_GUARD]) return;
   try {
     Object.defineProperty(window, _GUARD, {
@@ -56,24 +124,82 @@
     GCS     : window.getComputedStyle.bind(window),
     sT      : window.setTimeout.bind(window),
     sI         : window.setInterval.bind(window),
-    scrollTo   : window.scrollTo?.bind(window)   || null,
-    scrollBy   : window.scrollBy?.bind(window)   || null,
-    insertRule : CSSStyleSheet.prototype.insertRule,
-    create     : document.createElement.bind(document),
-    perfNow    : performance.now.bind(performance),
+    scrollTo    : window.scrollTo?.bind(window)   || null,
+    scrollBy    : window.scrollBy?.bind(window)   || null,
+    insertRule  : CSSStyleSheet.prototype.insertRule,
+    replaceSync : CSSStyleSheet.prototype.replaceSync  || null,
+    cssReplace  : CSSStyleSheet.prototype.replace      || null,
+    setProp     : CSSStyleDeclaration.prototype.setProperty,
+    create         : document.createElement.bind(document),
+    perfNow        : performance.now.bind(performance),
+    removeAllRanges : typeof Selection  !== 'undefined' ? Selection.prototype.removeAllRanges : null,
+    selectionEmpty  : typeof Selection  !== 'undefined' ? Selection.prototype.empty           : null,
+    selToString     : typeof Selection  !== 'undefined' ? Selection.prototype.toString          : null,
+    designModeDesc  : (() => {
+      try { return Object.getOwnPropertyDescriptor(Document.prototype,'designMode')
+                 || Object.getOwnPropertyDescriptor(document,'designMode') || null; }
+      catch(_){ return null; }
+    })(),
+    // Descripteurs originaux de visibilité pour restauration propre
+    visDescs: (() => {
+      const d = {}, doc = Document.prototype;
+      ['hidden','webkitHidden','visibilityState','webkitVisibilityState'].forEach(p => {
+        try { d[p] = Object.getOwnPropertyDescriptor(doc, p)
+                   || Object.getOwnPropertyDescriptor(document, p) || null; }
+        catch(_) {}
+      });
+      return d;
+    })(),
+    matchMedia    : window.matchMedia?.bind(window)        || null,
+    print         : window.print?.bind(window)             || null,
+    getSelection  : window.getSelection?.bind(window)      || null,
+    attachShadow  : Element.prototype.attachShadow         || null,
+    DTsetData     : typeof DataTransfer !== 'undefined'
+                    ? DataTransfer.prototype.setData : null,
   };
 
-  // Rend une fonction patchée indiscernable du natif
+  // Rend une fonction patchée indiscernable du natif.
+  //
+  // Approche WeakMap (v2.2.8) : au lieu d'ajouter une propriété `toString`
+  // en propre sur chaque fn (détectable via fn.hasOwnProperty('toString')),
+  // on intercepte Function.prototype.toString une seule fois et on stocke
+  // les noms dans un WeakMap invisible.
+  //
+  // Résultat :
+  //   fn.hasOwnProperty('toString')           → false  (identique au natif)
+  //   Object.getOwnPropertyDescriptor(fn,'toString') → undefined  ✓
+  //   fn.toString()                           → "function name() { [native code] }"  ✓
+  const _nativeNames  = new WeakMap();
+  const _origFnToStr  = Function.prototype.toString;
+  try {
+    const _patchedToStr = function toString() {
+      const n = _nativeNames.get(this);
+      if (n !== undefined) return `function ${n}() { [native code] }`;
+      return _origFnToStr.call(this);
+    };
+    _nativeNames.set(_patchedToStr, 'toString'); // se passe lui-même pour natif
+    Object.defineProperty(Function.prototype, 'toString', {
+      value: _patchedToStr, writable: true, configurable: true, enumerable: false,
+    });
+  } catch (_) {}
+
   function nativeToStr(fn, name) {
-    try {
-      Object.defineProperty(fn, 'name', { value: name, configurable: true });
-      fn.toString = function () { return `function ${name}() { [native code] }`; };
-      fn.toString.toString = function () { return `function toString() { [native code] }`; };
-    } catch (_) {}
+    try { Object.defineProperty(fn, 'name', { value: name, configurable: true }); } catch (_) {}
+    _nativeNames.set(fn, name); // aucune own property 'toString' sur fn
     return fn;
   }
 
   // ── Token d'authentification postMessage ─────────────────────────
+  // Clés booléennes qui déterminent si l'extension est "active"
+  const _ACTIVE_KEYS = [
+    'contextmenu','selectstart','clipboard','keyboard','dragdrop','scroll',
+    'cursor','pointerEvents','print','overlays','devtools','consoleProtect',
+    'focus','visibility',
+  ];
+  function anyActive() {
+    return _ACTIVE_KEYS.some(k => S[k]);
+  }
+
   let _authToken = null;
   let _tokenSet  = false;
 
@@ -88,7 +214,10 @@
   const MAX_PAYLOAD_BYTES = 65536;
   function validatePayload(p) {
     if (!p || typeof p !== 'object' || Array.isArray(p)) return false;
-    for (const k of Object.keys(p)) if (!ALLOWED_KEYS.has(k)) return false;
+    const keys = Object.keys(p);
+    // Vérification rapide du nombre de clés avant le JSON.stringify coûteux
+    if (keys.length > ALLOWED_KEYS.size) return false;
+    for (const k of keys) if (!ALLOWED_KEYS.has(k)) return false;
     try { if (JSON.stringify(p).length > MAX_PAYLOAD_BYTES) return false; } catch (_) { return false; }
     return true;
   }
@@ -132,6 +261,8 @@
     wheel           : 'scroll',
     touchmove       : 'scroll',
     beforeprint     : 'print',
+    beforeunload    : 'keyboard', // neutralise les alertes "quitter la page ?"
+    pagehide        : 'keyboard', // équivalent SPA de beforeunload
     selectionchange : 'selectstart',
     visibilitychange: 'visibility',
   };
@@ -150,26 +281,22 @@
     ondragover       : 'dragdrop',
     ondrop           : 'dragdrop',
     onselectionchange: 'selectstart',
-    onbeforeprint : 'print',
+    onbeforeprint    : 'print',
+    onbeforeunload   : 'keyboard',
     onblur        : 'focus',
   };
+
+  // Set de tags interactifs partagé par blocked() et clearInlineHandlers
+  const _INTERACTIVE_TAGS = new Set(['INPUT','TEXTAREA','SELECT','BUTTON','OPTION','OPTGROUP']);
 
   function blocked(ev) {
     const k = EV[ev.type];
     if (!k || !S[k]) return false;
-    // Keyboard : ne jamais bloquer sur les éléments interactifs pour les
-    // touches sans modificateur — évite de casser les formulaires, modales,
-    // sliders, éditeurs custom. On bloque quand même Ctrl/Meta+key (qui sont
-    // les raccourcis que les sites bloquent abusivement).
     if (k === 'keyboard') {
       if (!ev.ctrlKey && !ev.metaKey && !ev.altKey) {
         const tgt = ev.target;
         if (tgt && tgt !== document && tgt !== document.documentElement && tgt !== document.body) {
-          const tag = tgt.tagName;
-          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
-              tag === 'BUTTON' || tgt.isContentEditable) {
-            return false;
-          }
+          if (_INTERACTIVE_TAGS.has(tgt.tagName) || tgt.isContentEditable) return false;
         }
       }
     }
@@ -210,38 +337,76 @@
   // L2 — addEventListener wrapping
   // Deuxième filet : wrapping individuel de chaque listener.
   // ════════════════════════════════════════════════════════════════
-  const _wmap = new WeakMap();
+  // _wmap : fn → wrapper. Clé composite (fn + capture) pour éviter la
+  // collision quand le même fn est enregistré en capture ET en bubbling.
+  // WeakMap principal sur fn, Map interne sur la capture flag.
+  const _wmap = new WeakMap(); // fn → { bubble: w, capture: w }
+
+  function _getWrapper(fn, capture) {
+    let entry = _wmap.get(fn);
+    if (!entry) { entry = {}; _wmap.set(fn, entry); }
+    const key = capture ? 'capture' : 'bubble';
+    if (!entry[key]) {
+      const h = typeof fn === 'function' ? fn
+              : (fn && typeof fn.handleEvent === 'function') ? fn.handleEvent.bind(fn)
+              : fn;
+      entry[key] = function (e) {
+        if (blocked(e)) {
+          const p = e.preventDefault, s = e.stopPropagation, si = e.stopImmediatePropagation;
+          e.preventDefault = e.stopPropagation = e.stopImmediatePropagation = function () {};
+          try { h.call(this, e); } catch (_) {}
+          e.preventDefault = p; e.stopPropagation = s; e.stopImmediatePropagation = si;
+        } else {
+          h.call(this, e);
+        }
+      };
+    }
+    return entry[key];
+  }
 
   EventTarget.prototype.addEventListener = nativeToStr(function addEventListener(type, fn, opts) {
-    const h = typeof fn === 'function' ? fn
-            : (fn && typeof fn.handleEvent === 'function') ? fn.handleEvent.bind(fn)
-            : null;
-    if (h && EV[type]) {
-      let w = _wmap.get(fn);
-      if (!w) {
-        // On utilise blocked(ev) (pas juste S[k]) pour que L2 soit cohérent
-        // avec L1 : les exemptions (keyboard sur INPUT/TEXTAREA…) s'appliquent
-        // aussi ici, évitant de casser les handlers légitimes sur les formulaires.
-        w = function (e) {
-          if (blocked(e)) {
-            const p = e.preventDefault, s = e.stopPropagation, si = e.stopImmediatePropagation;
-            e.preventDefault = e.stopPropagation = e.stopImmediatePropagation = function () {};
-            try { h.call(this, e); } catch (_) {}
-            e.preventDefault = p; e.stopPropagation = s; e.stopImmediatePropagation = si;
-          } else {
-            h.call(this, e);
-          }
-        };
-        _wmap.set(fn, w);
-      }
-      return N.AEL.call(this, type, w, opts);
+    if (fn && EV[type]) {
+      const cap = typeof opts === 'boolean' ? opts : (opts?.capture ?? false);
+      return N.AEL.call(this, type, _getWrapper(fn, cap), opts);
     }
     return N.AEL.call(this, type, fn, opts);
   }, 'addEventListener');
 
   EventTarget.prototype.removeEventListener = nativeToStr(function removeEventListener(type, fn, opts) {
-    return N.REL.call(this, type, _wmap.get(fn) ?? fn, opts);
+    if (fn && EV[type]) {
+      const cap = typeof opts === 'boolean' ? opts : (opts?.capture ?? false);
+      const entry = _wmap.get(fn);
+      const w = entry?.[cap ? 'capture' : 'bubble'];
+      return N.REL.call(this, type, w ?? fn, opts);
+    }
+    return N.REL.call(this, type, fn, opts);
   }, 'removeEventListener');
+
+  // ════════════════════════════════════════════════════════════════
+  // lockPatches — protège L1 contre la réaffectation simple.
+  // Utilise un accesseur {get, set:noop, configurable:true} :
+  //   • assignment Event.prototype.preventDefault = fn → ignoré silencieusement
+  //   • configurable:true → même apparence qu'une prop native (moins détectable)
+  //   • addEventListener/removeEventListener intentionnellement exclus :
+  //     zone.js (Angular), Vue, SDKs vidéo les re-patchent à l'init.
+  //     Les verrouiller cassait ces frameworks même avec tout désactivé.
+  // ════════════════════════════════════════════════════════════════
+  function lockPatches() {
+    const guard = (obj, prop, fn) => {
+      try {
+        if (Object.getOwnPropertyDescriptor(obj, prop)?.configurable) {
+          N.DP(obj, prop, {
+            get: () => fn, set: () => {},
+            configurable: true, enumerable: true,
+          });
+        }
+      } catch (_) {}
+    };
+    guard(Event.prototype, 'preventDefault',           Event.prototype.preventDefault);
+    guard(Event.prototype, 'stopPropagation',          Event.prototype.stopPropagation);
+    guard(Event.prototype, 'stopImmediatePropagation', Event.prototype.stopImmediatePropagation);
+    // Note: addEventListener/removeEventListener non verrouillés (compatibilité frameworks)
+  }
 
   // ════════════════════════════════════════════════════════════════
   // L3 — on* property traps via defineProperty
@@ -269,17 +434,43 @@
   );
 
   // ════════════════════════════════════════════════════════════════
-  // L4 — Capture-phase sentinels
-  // S'exécute avant tout listener de la page.
+  // L4 — Capture-phase sentinels (enregistrement différé)
+  // passive:true obligatoire — voir explication v2.2.4.
+  // Les sentinels sont pré-créés ici mais enregistrés / retirés
+  // dynamiquement selon anyActive() pour laisser zéro trace quand
+  // l'extension est entièrement désactivée.
   // ════════════════════════════════════════════════════════════════
+  const _sentinelFns = new Map(); // type → fn (pré-créées, pas encore enregistrées)
+  let   _sentinelsOn = false;
+
   Object.keys(EV).forEach(type => {
-    N.AEL.call(document, type, e => {
+    _sentinelFns.set(type, e => {
       if (!blocked(e)) return;
-      try {
-        N.DP(e, 'defaultPrevented', { get: () => false, configurable: true });
-      } catch (_) {}
-    }, { capture: true, passive: false });
+      try { N.DP(e, 'defaultPrevented', { get: () => false, configurable: true }); }
+      catch (_) {}
+    });
   });
+  // beforeunload : neutralise e.returnValue en plus de defaultPrevented
+  // (c'est returnValue qui déclenche le dialog natif, pas preventDefault)
+  _sentinelFns.set('beforeunload', e => {
+    if (!blocked(e)) return;
+    try { N.DP(e, 'defaultPrevented', { get: () => false, configurable: true }); } catch (_) {}
+    try { N.DP(e, 'returnValue', { get: () => '', set: () => {}, configurable: true }); } catch (_) {}
+  });
+
+  function _addSentinels() {
+    if (_sentinelsOn) return;
+    _sentinelFns.forEach((fn, type) =>
+      N.AEL.call(document, type, fn, { capture: true, passive: true }));
+    _sentinelsOn = true;
+  }
+
+  function _removeSentinels() {
+    if (!_sentinelsOn) return;
+    _sentinelFns.forEach((fn, type) =>
+      N.REL.call(document, type, fn, { capture: true }));
+    _sentinelsOn = false;
+  }
 
   // ════════════════════════════════════════════════════════════════
   // L5 — CSS injection
@@ -298,10 +489,11 @@
     }
     if (S.cursor) {
       r.push(
-        `*{cursor:auto!important}`,
+        `*{cursor:auto!important;-webkit-touch-callout:default!important}`,
         `a,button,[role="button"],[onclick],[tabindex="0"]{cursor:pointer!important}`,
         `input[type="text"],input[type="search"],input[type="email"],input[type="password"],` +
-        `input[type="url"],input[type="number"],textarea,[contenteditable="true"],[contenteditable=""]{cursor:text!important}`
+        `input[type="url"],input[type="number"],textarea,[contenteditable="true"],[contenteditable=""]{cursor:text!important}`,
+        `input[type="range"]{cursor:ew-resize!important}`
       );
     }
     if (S.scroll) {
@@ -341,8 +533,9 @@
     if (css === _cssCache && _css?.isConnected) return; // rien de nouveau, on évite le reflow
     _cssCache = css;
     if (!_css) {
+      // Pas d'attribut identifiable : on garde seulement la référence JS.
+      // Un attribut visible (data-op, data-ext…) serait un fingerprint DOM.
       _css = N.create('style');
-      _css.setAttribute('data-op', '1');
     }
     _css.textContent = css;
     const root = document.head || document.documentElement;
@@ -414,18 +607,16 @@
   // Éléments interactifs dont on ne retire jamais les handlers inline :
   // supprimer onkeydown d'un <input> de validation, d'un <select> ou d'un
   // <button> casserait les formulaires, les composants custom et les éditeurs.
-  const INTERACTIVE_TAGS = new Set(['INPUT','TEXTAREA','SELECT','BUTTON','OPTION','OPTGROUP']);
-
-  // Sélecteur CSS mis en cache — ON ne mute jamais après initialisation.
-  // Évite de reconstruire la string à chaque appel de clearInlineHandlers.
-  const _ON_SEL = Object.keys(ON).map(p => `[${p}]`).join(',');
+  // Sélecteur CSS et entrées mis en cache — ON ne mute jamais après initialisation.
+  const _ON_SEL     = Object.keys(ON).map(p => `[${p}]`).join(',');
+  const _ON_ENTRIES = Object.entries(ON); // évite Object.entries() sur chaque nœud
 
   function clearInlineHandlers(root) {
     const nodes = root
       ? [root]
       : [document, document.documentElement, document.body, window];
     nodes.filter(Boolean).forEach(node => {
-      Object.entries(ON).forEach(([prop, key]) => {
+      _ON_ENTRIES.forEach(([prop, key]) => {
         if (!S[key]) return;
         try {
           if (node[prop] != null) node[prop] = null;
@@ -439,7 +630,7 @@
         scope.querySelectorAll(_ON_SEL).forEach(el => {
           // Ne pas toucher aux éléments interactifs ni aux éléments contenteditable
           if (INTERACTIVE_TAGS.has(el.tagName) || el.isContentEditable) return;
-          Object.entries(ON).forEach(([prop, key]) => {
+          _ON_ENTRIES.forEach(([prop, key]) => {
             if (S[key] && el.hasAttribute(prop)) {
               el.removeAttribute(prop);
               try { el[prop] = null; } catch (_) {}
@@ -485,21 +676,35 @@
   // L7 — Visibility spoofing
   // ════════════════════════════════════════════════════════════════
   function patchVisibility() {
-    if (!S.visibility) return;
-    ['hidden', 'webkitHidden'].forEach(p => {
-      try { N.DP(document, p, { get: () => false, configurable: true, enumerable: true }); } catch (_) {}
-    });
-    ['visibilityState', 'webkitVisibilityState'].forEach(p => {
-      try { N.DP(document, p, { get: () => 'visible', configurable: true, enumerable: true }); } catch (_) {}
-    });
-    // Certains sites utilisent document.hasFocus() pour détecter un changement d'onglet.
-    // On le spoofle également pour compléter le bypass visibilité.
-    try {
-      N.DP(document, 'hasFocus', {
-        value: nativeToStr(function hasFocus() { return true; }, 'hasFocus'),
-        configurable: true, writable: true,
+    if (S.visibility) {
+      if (_visPatched) return;
+      _visPatched = true;
+      ['hidden', 'webkitHidden'].forEach(p => {
+        try { N.DP(document, p, { get: () => false, configurable: true, enumerable: true }); } catch (_) {}
       });
-    } catch (_) {}
+      ['visibilityState', 'webkitVisibilityState'].forEach(p => {
+        try { N.DP(document, p, { get: () => 'visible', configurable: true, enumerable: true }); } catch (_) {}
+      });
+      try {
+        N.DP(document, 'hasFocus', {
+          value: nativeToStr(function hasFocus() { return true; }, 'hasFocus'),
+          configurable: true, writable: true,
+        });
+      } catch (_) {}
+    } else {
+      if (!_visPatched) return;
+      _visPatched = false;
+      // Restaurer les descripteurs originaux
+      ['hidden','webkitHidden','visibilityState','webkitVisibilityState'].forEach(p => {
+        const d = N.visDescs?.[p];
+        if (d) { try { N.DP(document, p, d); } catch (_) {} }
+      });
+      // hasFocus : restaurer depuis Document.prototype
+      try {
+        const d = N.GCD(Document.prototype, 'hasFocus');
+        if (d) N.DP(document, 'hasFocus', d);
+      } catch (_) {}
+    }
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -611,11 +816,13 @@
   // ════════════════════════════════════════════════════════════════
   function patchConsole() {
     if (S.consoleProtect) {
+      if (_consolePatched) return;
+      _consolePatched = true;
       console.clear = nativeToStr(function clear() {}, 'clear');
       try {
-        const _log = console.log.bind(console);
+        _origConsoleLog = console.log.bind(console);
         console.log = nativeToStr(function log(...args) {
-          return _log(...args.map(a => {
+          return _origConsoleLog(...args.map(a => {
             if (a && typeof a === 'object') {
               try { if (/devtools/i.test(String(a))) return '[object Object]'; } catch (_) {}
             }
@@ -624,7 +831,14 @@
         }, 'log');
       } catch (_) {}
     } else {
+      if (!_consolePatched) return;
+      _consolePatched = false;
       console.clear = N.CC;
+      // Restaurer console.log (bug: n'était jamais restauré avant v2.2.7)
+      if (_origConsoleLog) {
+        try { console.log = nativeToStr(_origConsoleLog, 'log'); } catch (_) {}
+        _origConsoleLog = null;
+      }
     }
   }
 
@@ -633,27 +847,31 @@
   // Re-applique les protections après pushState/replaceState/popstate.
   // ════════════════════════════════════════════════════════════════
   function hookSPANavigation() {
-    const rewrap = () => N.sT(() => { clearInlineHandlers(); if (S.dragdrop) fixDraggable(); applyCSS(); }, 100);
-    try {
-      const _push = history.pushState.bind(history);
-      history.pushState = nativeToStr(function pushState(...args) {
-        const r = _push(...args); rewrap(); return r;
-      }, 'pushState');
-    } catch (_) {}
-    try {
-      const _rep = history.replaceState.bind(history);
-      history.replaceState = nativeToStr(function replaceState(...args) {
-        const r = _rep(...args); rewrap(); return r;
-      }, 'replaceState');
-    } catch (_) {}
-    N.AEL.call(window, 'popstate',   rewrap);
-    N.AEL.call(window, 'hashchange', rewrap);
-    // Polling de sécurité : couvre les frameworks qui changent location.href
-    // sans passer par history API (Svelte, Astro, Qwik, certains routers…).
-    // Coût : ~0.01 ms/tick à 1 Hz, négligeable.
-    let _lastHref = location.href;
-    N.sI(() => {
-      if (location.href !== _lastHref) { _lastHref = location.href; rewrap(); }
+    if (!_spaHooked) {
+      _spaHooked = true;
+      // Patcher les history APIs UNE SEULE FOIS.
+      // _spaHooked empêche le double-wrapping si hookSPANavigation() est rappelé
+      // après un teardown+réactivation (le patch survit au teardown).
+      try {
+        const _push = history.pushState.bind(history);
+        history.pushState = nativeToStr(function pushState(...args) {
+          const r = _push(...args); _spaRewrap(); return r;
+        }, 'pushState');
+      } catch (_) {}
+      try {
+        const _rep = history.replaceState.bind(history);
+        history.replaceState = nativeToStr(function replaceState(...args) {
+          const r = _rep(...args); _spaRewrap(); return r;
+        }, 'replaceState');
+      } catch (_) {}
+      N.AEL.call(window, 'popstate',   _spaRewrap);
+      N.AEL.call(window, 'hashchange', _spaRewrap);
+    }
+    // Redémarrer le polling (peut être relancé après teardown)
+    if (_spaInterval) clearInterval(_spaInterval);
+    _lastHref = location.href;
+    _spaInterval = N.sI(() => {
+      if (location.href !== _lastHref) { _lastHref = location.href; _spaRewrap(); }
     }, 1000);
   }
 
@@ -670,11 +888,20 @@
     clearTimeout(_uiTimer);
     _uiTimer = N.sT(() => { _userInteracting = false; }, 600);
   }
-  N.AEL.call(document, 'pointerdown', _markUserActive, { capture: true, passive: true });
-  N.AEL.call(document, 'keydown',     _markUserActive, { capture: true, passive: true });
+  // _markUserActive listeners : enregistrés/retirés dynamiquement par patchFocus()
+  // (jamais actifs si S.focus n'a jamais été true → zéro trace par défaut)
+  let _markListenersAdded = false;
 
   function patchFocus() {
     if (S.focus) {
+      // Enregistrer les listeners _markUserActive seulement quand nécessaire
+      if (!_markListenersAdded) {
+        N.AEL.call(document, 'pointerdown', _markUserActive, { capture: true, passive: true });
+        N.AEL.call(document, 'keydown',     _markUserActive, { capture: true, passive: true });
+        _markListenersAdded = true;
+      }
+      if (_focusPatched) return; // déjà actif
+      _focusPatched = true;
       HTMLElement.prototype.focus = nativeToStr(function focus(o) {
         if (_userInteracting) return N.focus.call(this, o);
       }, 'focus');
@@ -682,6 +909,13 @@
         if (_userInteracting) return N.blur.call(this);
       }, 'blur');
     } else {
+      if (_markListenersAdded) {
+        N.REL.call(document, 'pointerdown', _markUserActive, { capture: true });
+        N.REL.call(document, 'keydown',     _markUserActive, { capture: true });
+        _markListenersAdded = false;
+      }
+      if (!_focusPatched) return; // déjà restauré
+      _focusPatched = false;
       HTMLElement.prototype.focus = N.focus;
       HTMLElement.prototype.blur  = N.blur;
     }
@@ -691,7 +925,16 @@
   // OVERLAY MANAGER
   // ════════════════════════════════════════════════════════════════
   const _overlays = new Map();
+  const _ovEls   = new WeakMap(); // el → overlayId — remplace el.dataset.uaOvId
   let _ovCnt = 0;
+  let _ovlDebTimer = null;
+
+  // Debounce _sendOverlayList : évite N postMessages si N overlays sont cachés
+  // d'un coup (ex: autoRemoveOverlays sur une page avec plusieurs éléments).
+  function _scheduleOverlayList() {
+    clearTimeout(_ovlDebTimer);
+    _ovlDebTimer = N.sT(_sendOverlayList, 50);
+  }
 
   function _elDesc(el) {
     const id  = el.id ? `#${el.id}` : '';
@@ -702,15 +945,15 @@
   }
 
   function hideOverlay(el, auto = false) {
-    if (!el || el.dataset?.uaOvId) return;
+    if (!el || _ovEls.has(el)) return; // déjà masqué — plus de fingerprint DOM
     const id = `ov_${++_ovCnt}`;
     _overlays.set(id, {
       el, origDisplay: el.style.display, origVis: el.style.visibility,
       origOp: el.style.opacity, desc: _elDesc(el), auto, ts: Date.now(),
     });
-    try { el.dataset.uaOvId = id; } catch (_) {}
-    el.style.setProperty('display', 'none', 'important');
-    _sendOverlayList();
+    _ovEls.set(el, id); // WeakMap : invisible, GC-friendly
+    N.setProp.call(el.style, 'display', 'none', 'important');
+    _scheduleOverlayList();
   }
 
   function restoreOverlay(id) {
@@ -719,9 +962,9 @@
     e.el.style.display    = e.origDisplay;
     e.el.style.visibility = e.origVis;
     e.el.style.opacity    = e.origOp;
-    try { delete e.el.dataset.uaOvId; } catch (_) {}
+    _ovEls.delete(e.el);   // nettoyer le WeakMap
     _overlays.delete(id);
-    _sendOverlayList();
+    _scheduleOverlayList();
   }
 
   function _sendOverlayList() {
@@ -733,7 +976,7 @@
     if (!S.overlays) return;
     try {
       document.querySelectorAll('div,section,aside,article,header').forEach(el => {
-        if (el.dataset?.uaOvId) return;
+        if (_ovEls.has(el)) return; // déjà masqué
         const cs = N.GCS(el);
         const zi = parseInt(cs.zIndex) || 0;
         if ((cs.position === 'fixed' || cs.position === 'absolute') && zi > 100) {
@@ -748,8 +991,9 @@
         }
       });
       ['overflow','overflow-y','height','max-height'].forEach(p => {
-        document.body?.style.setProperty(p, 'auto', 'important');
-        document.documentElement?.style.setProperty(p, 'auto', 'important');
+        // N.setProp direct : évite de passer par notre propre patchStyleSetProperty
+        if (document.body) N.setProp.call(document.body.style, p, 'auto', 'important');
+        if (document.documentElement) N.setProp.call(document.documentElement.style, p, 'auto', 'important');
       });
       ['modal-open','overflow-hidden','no-scroll','noscroll','scroll-lock','locked']
         .forEach(c => document.body?.classList.remove(c));
@@ -839,8 +1083,9 @@
       try {
         // eslint-disable-next-line no-new-func
         (new Function(sc.code))();
-      } catch (e) {
-        console.warn(`[Overpass] Script "${sc.name}":`, e.message);
+      } catch (_) {
+        // Échec silencieux : un console.warn avec le nom de l'extension
+        // serait un fingerprint identifiable par n'importe quel site.
       }
     });
   }
@@ -852,9 +1097,13 @@
   // ════════════════════════════════════════════════════════════════
   function patchScroll() {
     if (S.scroll && N.scrollTo) {
+      if (_scrollPatched) return;
+      _scrollPatched = true;
       window.scrollTo = nativeToStr(function scrollTo() {}, 'scrollTo');
       window.scrollBy = nativeToStr(function scrollBy() {}, 'scrollBy');
     } else {
+      if (!_scrollPatched) return;
+      _scrollPatched = false;
       if (N.scrollTo) window.scrollTo = N.scrollTo;
       if (N.scrollBy) window.scrollBy = N.scrollBy;
     }
@@ -866,9 +1115,12 @@
   // réintroduisent user-select:none ou cursor:none après l'injection
   // CSS de L5. Toutes les autres règles passent sans modification.
   // ════════════════════════════════════════════════════════════════
+  let _insertRuleActive = false;
   function patchInsertRule() {
-    if (!S.selectstart && !S.cursor) {
-      // Aucune protection active : restaurer la méthode native
+    const needed = S.selectstart || S.cursor;
+    if (needed === _insertRuleActive) return; // rien à changer
+    _insertRuleActive = needed;
+    if (!needed) {
       CSSStyleSheet.prototype.insertRule = N.insertRule;
       return;
     }
@@ -884,9 +1136,455 @@
   }
 
   // ════════════════════════════════════════════════════════════════
+  // patchStyleSetProperty — bloque les inline style !important.
+  //
+  // Vecteur : element.style.setProperty('user-select','none','important')
+  // Un inline style avec priority='important' bat n'importe quel
+  // !important dans une stylesheet (cascade CSS inline > stylesheet).
+  // On intercepte uniquement les propriétés connues avec val='none'.
+  // ════════════════════════════════════════════════════════════════
+  let _setPropActive = false;
+  function patchStyleSetProperty() {
+    const needed = S.selectstart || S.cursor;
+    if (needed === _setPropActive) return;
+    _setPropActive = needed;
+    if (!needed) {
+      CSSStyleDeclaration.prototype.setProperty = N.setProp;
+      return;
+    }
+    CSSStyleDeclaration.prototype.setProperty = nativeToStr(function setProperty(prop, val, priority) {
+      // Comparaisons directes sans regex : setProperty est un chemin ultra-chaud
+      // sur les pages à animations (vidéo, jeux, dashboards).
+      // Les noms de propriétés CSS sont toujours en minuscules dans setProperty.
+      if (val === 'none' || val === 'none !important') {
+        if (S.selectstart &&
+            (prop === 'user-select' || prop === '-webkit-user-select' || prop === '-moz-user-select'))
+          return;
+        if (S.cursor && prop === 'cursor')
+          return;
+      }
+      return N.setProp.call(this, prop, val, priority);
+    }, 'setProperty');
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // patchAdoptedStyleSheets — couvre le vecteur adoptedStyleSheets.
+  //
+  // document.adoptedStyleSheets = [sheet] permet aux sites d'injecter
+  // du CSS via CSSStyleSheet.replaceSync/replace, en contournant
+  // insertRule. Notre CSS !important dans <style> l'emporte déjà dans
+  // la cascade (les @important des stylesheets antérieurs gagnent), mais
+  // on ajoute une réinjection défensive sur le prochain tick si des
+  // règles globales restrictives sont détectées.
+  // ════════════════════════════════════════════════════════════════
+  const _RESTRICT_RE = /(html|body|\*)[^{]*\{[^}]*(user-select\s*:\s*none|cursor\s*:\s*none)/i;
+
+  let _adoptedActive = false;
+  function patchAdoptedStyleSheets() {
+    const needed = S.selectstart || S.cursor;
+    if (needed === _adoptedActive) return;
+    _adoptedActive = needed;
+    if (!needed) {
+      if (N.replaceSync) CSSStyleSheet.prototype.replaceSync = N.replaceSync;
+      if (N.cssReplace)  CSSStyleSheet.prototype.replace     = N.cssReplace;
+      return;
+    }
+
+    function onRestrictiveCSS() {
+      // Invalide le cache CSS et réinjecte au prochain tick.
+      // Notre <style> !important écrase le adoptedStyleSheet hostile.
+      _cssCache = '';
+      N.sT(applyCSS, 0);
+    }
+
+    if (N.replaceSync) {
+      CSSStyleSheet.prototype.replaceSync = nativeToStr(function replaceSync(css) {
+        N.replaceSync.call(this, css);
+        if (typeof css === 'string' && _RESTRICT_RE.test(css)) onRestrictiveCSS();
+      }, 'replaceSync');
+    }
+
+    if (N.cssReplace) {
+      CSSStyleSheet.prototype.replace = nativeToStr(function replace(css) {
+        const p = N.cssReplace.call(this, css);
+        if (typeof css === 'string' && _RESTRICT_RE.test(css))
+          p.then(onRestrictiveCSS).catch(() => {});
+        return p;
+      }, 'replace');
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // patchSelection — bloque window.getSelection().removeAllRanges()
+  //
+  // Vecteur résiduel : les handlers selectionchange des sites appellent
+  // removeAllRanges() directement sur l'objet Selection pour effacer
+  // la sélection de l'utilisateur. L1/L2/L4 bloquent le handler mais
+  // pas la méthode removeAllRanges elle-même.
+  //
+  // Approche : flag _blockClear actif SEULEMENT pendant la fenêtre
+  // synchrone d'un event selectionchange (sentinel capture-phase → sT(0)
+  // pour lever le flag après tous les handlers sync). Les appels légitimes
+  // (clic vide, focus, éditeurs rich-text hors selectionchange) passent.
+  // ════════════════════════════════════════════════════════════════
+  let _blockClear         = false;
+  let _selPatched         = false;
+  let _focusPatched       = false; // flag patchFocus  — évite re-assign à chaque applyAll
+  let _scrollPatched      = false; // flag patchScroll
+  let _visPatched         = false; // flag patchVisibility
+  let _consolePatched     = false; // flag patchConsole
+  let _matchMediaPatched  = false; // flag patchPrint (matchMedia)
+  let _spaHooked          = false; // flag hookSPA — empêche le double-wrapping des history APIs
+  let _spaInterval        = null;  // ID du setInterval SPA polling (module-level pour teardown)
+  let _lastHref           = '';    // suivi URL pour le polling SPA
+  let _selChangeLn        = null;  // référence au listener selectionchange (pour teardown)
+  let _origConsoleLog     = null;  // référence au console.log original (pour restauration)
+
+  // SPA rewrap hoissté au niveau module pour être partagé entre hookSPANavigation
+  // et l'intervalle de polling (évite de créer une nouvelle closure à chaque call).
+  function _spaRewrap() {
+    N.sT(() => { clearInlineHandlers(); if (S.dragdrop) fixDraggable(); applyCSS(); }, 100);
+  }
+
+  // Sentinel selectionchange : active la fenêtre de blocage
+  // Stocké dans _selChangeLn pour pouvoir le retirer lors du teardown.
+  if (typeof Selection !== 'undefined') {
+    _selChangeLn = () => {
+      if (!S.selectstart) return;
+      _blockClear = true;
+      N.sT(() => { _blockClear = false; }, 0);
+    };
+    N.AEL.call(document, 'selectionchange', _selChangeLn, { capture: true, passive: true });
+  }
+
+  function patchSelection() {
+    if (!N.removeAllRanges || typeof Selection === 'undefined') return;
+    const needed = S.selectstart;
+    if (needed === _selPatched) return;
+    _selPatched = needed;
+    if (needed) {
+      Selection.prototype.removeAllRanges = nativeToStr(function removeAllRanges() {
+        if (_blockClear) return;
+        return N.removeAllRanges.call(this);
+      }, 'removeAllRanges');
+      if (N.selectionEmpty) {
+        Selection.prototype.empty = nativeToStr(function empty() {
+          if (_blockClear) return;
+          return N.selectionEmpty.call(this);
+        }, 'empty');
+      }
+      // Protéger Selection.toString : certains sites le surchargent pour retourner
+      // '' et vider le texte copié même quand la sélection est visuellement présente.
+      if (N.selToString) {
+        Selection.prototype.toString = nativeToStr(function toString() {
+          return N.selToString.call(this);
+        }, 'toString');
+      }
+    } else {
+      Selection.prototype.removeAllRanges = N.removeAllRanges;
+      if (N.selectionEmpty) Selection.prototype.empty = N.selectionEmpty;
+      if (N.selToString)    Selection.prototype.toString = N.selToString;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // patchDesignMode — bloque document.designMode = 'on'.
+  //
+  // document.designMode='on' met le document en mode édition, ce qui
+  // supprime user-select sur tout le document et contourne L5/L1/L2.
+  // On le neutralise en no-op quand selectstart est actif.
+  // ════════════════════════════════════════════════════════════════
+  let _designModePatched = false;
+  let _shadowPatched     = false;
+  let _clipboardPatched  = false;
+  let _getSelPatched     = false;
+  let _clipboardCopyLn   = null;
+  const _shadowStyles    = new WeakMap();
+  const _shadowRoots     = new Set();
+  function patchDesignMode() {
+    const needed = S.selectstart;
+    if (needed === _designModePatched) return;
+    _designModePatched = needed;
+    if (needed) {
+      try {
+        N.DP(document, 'designMode', {
+          get: () => 'off', set: () => {},
+          configurable: true, enumerable: true,
+        });
+      } catch (_) {}
+    } else if (N.designModeDesc) {
+      try { N.DP(document, 'designMode', N.designModeDesc); } catch (_) {
+        try { delete document.designMode; } catch (_) {}
+      }
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // patchPrint — intercepte window.matchMedia('print').
+  //
+  // Nouveau vecteur : certains sites écoutent window.matchMedia('print')
+  // pour détecter une tentative d'impression et afficher un paywall.
+  // On intercepte matchMedia et on force matches=false pour les queries
+  // contenant 'print', empêchant la détection.
+  // ════════════════════════════════════════════════════════════════
+  function patchPrint() {
+    if (!N.matchMedia && !N.print) return;
+    if (S.print) {
+      if (_matchMediaPatched) return;
+      _matchMediaPatched = true;
+      if (N.matchMedia) {
+        window.matchMedia = nativeToStr(function matchMedia(q) {
+          const mql = N.matchMedia(q);
+          if (typeof q === 'string' && /\bprint\b|\bpage\b/i.test(q)) {
+            try { N.DP(mql, 'matches', { get: () => false, configurable: true, enumerable: true }); }
+            catch (_) {}
+          }
+          return mql;
+        }, 'matchMedia');
+      }
+      if (N.print) {
+        window.print = nativeToStr(function print() { return N.print(); }, 'print');
+      }
+    } else {
+      if (!_matchMediaPatched) return;
+      _matchMediaPatched = false;
+      if (N.matchMedia) window.matchMedia = N.matchMedia;
+      if (N.print)      window.print      = N.print;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // teardown — nettoyage complet quand toutes les features sont off.
+  // Retire toutes les traces de l'extension du document :
+  //   • L4 sentinels retirés du DOM
+  //   • MutationObserver déconnecté
+  //   • SPA polling interval nettoyé
+  //   • <style> element retiré
+  //   • EventTarget.prototype.addEventListener restauré au natif
+  //   • Listener selectionchange retiré
+  // L1 (accesseur guard) reste en place : transparent quand S est tout-false
+  // et son retrait impliquerait de patcher à nouveau les prototypes.
+  // L3 (on* traps) reste en place : vérifie S[key] à chaque appel → no-op.
+  // ════════════════════════════════════════════════════════════════
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // patchGetSelection — protège window.getSelection contre les overrides.
+  // Certains sites écrasent window.getSelection = () => null pour bloquer la
+  // sélection de texte même quand user-select est restauré.
+  // ─────────────────────────────────────────────────────────────────────────
+  function patchGetSelection() {
+    const needed = (S.selectstart || S.clipboard) && !!N.getSelection;
+    if (needed === _getSelPatched) return;
+    _getSelPatched = needed;
+    if (needed) {
+      try {
+        N.DP(window, 'getSelection', {
+          get: () => N.getSelection,
+          set: () => {},
+          configurable: true,
+          enumerable  : true,
+        });
+      } catch (_) {}
+    } else {
+      try { delete window.getSelection; } catch (_) {}
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // patchClipboardContent — restaure le texte sélectionné original quand un
+  // site modifie le clipboard lors d'un copy event (ex : ajoute une source).
+  // Intercepte DataTransfer.prototype.setData pendant les copy events.
+  // ─────────────────────────────────────────────────────────────────────────
+  let _inCopyEvent = false;
+  let _copySelText = '';
+
+  function patchClipboardContent() {
+    if (!N.DTsetData) return;
+    if (S.clipboard) {
+      if (_clipboardPatched) return;
+      _clipboardPatched = true;
+      _clipboardCopyLn = e => {
+        _inCopyEvent = true;
+        const sel = N.getSelection ? N.getSelection() : window.getSelection();
+        _copySelText = sel?.toString() || '';
+        N.sT(() => { _inCopyEvent = false; _copySelText = ''; }, 0);
+      };
+      N.AEL.call(document, 'copy', _clipboardCopyLn, { capture: true, passive: true });
+      DataTransfer.prototype.setData = nativeToStr(function setData(type, data) {
+        if (_inCopyEvent && _copySelText && type.toLowerCase() === 'text/plain' && data !== _copySelText) {
+          return N.DTsetData.call(this, type, _copySelText);
+        }
+        return N.DTsetData.call(this, type, data);
+      }, 'setData');
+    } else {
+      if (!_clipboardPatched) return;
+      _clipboardPatched = false;
+      if (_clipboardCopyLn) {
+        N.REL.call(document, 'copy', _clipboardCopyLn, { capture: true });
+        _clipboardCopyLn = null;
+      }
+      try { DataTransfer.prototype.setData = N.DTsetData; } catch (_) {}
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // patchShadowDOM — injecte les règles CSS bypass dans les shadow roots.
+  // Les paywalls modernes utilisent Shadow DOM pour isoler leur CSS.
+  // Notre <style> !important dans le document ne pénètre pas les shadow roots.
+  // On hook Element.prototype.attachShadow pour injecter au moment de la création,
+  // et on scanne les shadow roots existants au premier applyAll.
+  // ─────────────────────────────────────────────────────────────────────────
+  function _shadowCSS() {
+    const p = [];
+    if (S.selectstart)   p.push('*{user-select:auto!important;-webkit-user-select:auto!important}');
+    if (S.cursor)        p.push('*{cursor:auto!important;-webkit-touch-callout:default!important}');
+    if (S.pointerEvents) p.push('*{pointer-events:auto!important}');
+    return p.join('');
+  }
+
+  function _injectIntoShadow(root) {
+    const css = _shadowCSS();
+    if (!css || !root) return;
+    let st = _shadowStyles.get(root);
+    if (!st) {
+      st = document.createElement('style');
+      try { root.insertBefore(st, root.firstChild); } catch (_) { return; }
+      _shadowStyles.set(root, st);
+      _shadowRoots.add(root);
+    }
+    if (st.textContent !== css) st.textContent = css;
+  }
+
+  function _removeFromShadow(root) {
+    const st = _shadowStyles.get(root);
+    if (st?.isConnected) try { st.remove(); } catch (_) {}
+    _shadowStyles.delete(root);
+    _shadowRoots.delete(root);
+  }
+
+  function patchShadowDOM() {
+    const needed = (S.selectstart || S.cursor || S.pointerEvents) && !!N.attachShadow;
+    if (needed) {
+      if (!_shadowPatched) {
+        _shadowPatched = true;
+        Element.prototype.attachShadow = nativeToStr(function attachShadow(init) {
+          const shadow = N.attachShadow.call(this, init);
+          if (anyActive()) _injectIntoShadow(shadow);
+          return shadow;
+        }, 'attachShadow');
+      }
+      try {
+        document.querySelectorAll('*').forEach(el => {
+          if (el.shadowRoot) _injectIntoShadow(el.shadowRoot);
+        });
+      } catch (_) {}
+    } else {
+      if (!_shadowPatched) return;
+      _shadowPatched = false;
+      try { Element.prototype.attachShadow = N.attachShadow; } catch (_) {}
+      _shadowRoots.forEach(r => _removeFromShadow(r));
+      _shadowRoots.clear();
+    }
+  }
+
+  function teardown() {
+    _removeSentinels();
+    if (_obs) { _obs.disconnect(); _obs = null; }
+    if (_spaInterval) { clearInterval(_spaInterval); _spaInterval = null; }
+    if (_css?.isConnected) _css.remove();
+    _css = null; _cssCache = '';
+    try { EventTarget.prototype.addEventListener    = N.AEL; } catch (_) {}
+    try { EventTarget.prototype.removeEventListener = N.REL; } catch (_) {}
+    if (_selChangeLn) {
+      N.REL.call(document, 'selectionchange', _selChangeLn, { capture: true });
+      _selChangeLn = null;
+    }
+    try { CSSStyleSheet.prototype.insertRule = N.insertRule; } catch (_) {}
+    if (N.replaceSync) { try { CSSStyleSheet.prototype.replaceSync = N.replaceSync; } catch (_) {} }
+    if (N.cssReplace)  { try { CSSStyleSheet.prototype.replace     = N.cssReplace;  } catch (_) {} }
+    try { CSSStyleDeclaration.prototype.setProperty = N.setProp; } catch (_) {}
+    if (N.removeAllRanges && typeof Selection !== 'undefined') {
+      try { Selection.prototype.removeAllRanges = N.removeAllRanges; } catch (_) {}
+      if (N.selectionEmpty) { try { Selection.prototype.empty = N.selectionEmpty; } catch (_) {} }
+      if (N.selToString)    { try { Selection.prototype.toString = N.selToString;  } catch (_) {} }
+    }
+    if (_debTimer)    { clearTimeout(_debTimer);    _debTimer    = null; }
+    if (_ovlDebTimer) { clearTimeout(_ovlDebTimer); _ovlDebTimer = null; }
+    if (N.designModeDesc) { try { N.DP(document, 'designMode', N.designModeDesc); } catch (_) {} }
+    if (_focusPatched) {
+      HTMLElement.prototype.focus = N.focus;
+      HTMLElement.prototype.blur  = N.blur;
+      _focusPatched = false;
+    }
+    if (_markListenersAdded) {
+      N.REL.call(document, 'pointerdown', _markUserActive, { capture: true });
+      N.REL.call(document, 'keydown',     _markUserActive, { capture: true });
+      _markListenersAdded = false;
+    }
+    if (_uiTimer) { clearTimeout(_uiTimer); _uiTimer = null; }
+    _userInteracting = false;
+    if (_scrollPatched) {
+      if (N.scrollTo) window.scrollTo = N.scrollTo;
+      if (N.scrollBy) window.scrollBy = N.scrollBy;
+      _scrollPatched = false;
+    }
+    if (_visPatched) {
+      ['hidden','webkitHidden','visibilityState','webkitVisibilityState'].forEach(p => {
+        const d = N.visDescs?.[p];
+        if (d) { try { N.DP(document, p, d); } catch (_) {} }
+      });
+      try {
+        const d = N.GCD(Document.prototype, 'hasFocus');
+        if (d) N.DP(document, 'hasFocus', d);
+      } catch (_) {}
+      _visPatched = false;
+    }
+    if (_consolePatched) {
+      console.clear = N.CC;
+      if (_origConsoleLog) {
+        try { console.log = nativeToStr(_origConsoleLog, 'log'); } catch (_) {}
+        _origConsoleLog = null;
+      }
+      _consolePatched = false;
+    }
+    if (_matchMediaPatched) {
+      if (N.matchMedia) window.matchMedia = N.matchMedia;
+      if (N.print)      window.print      = N.print;
+      _matchMediaPatched = false;
+    }
+    if (_getSelPatched) {
+      try { delete window.getSelection; } catch (_) {}
+      _getSelPatched = false;
+    }
+    if (_clipboardPatched) {
+      if (_clipboardCopyLn) { N.REL.call(document,'copy',_clipboardCopyLn,{capture:true}); _clipboardCopyLn=null; }
+      try { DataTransfer.prototype.setData = N.DTsetData; } catch (_) {}
+      _clipboardPatched = false;
+    }
+    if (_shadowPatched) {
+      try { Element.prototype.attachShadow = N.attachShadow; } catch (_) {}
+      _shadowRoots.forEach(r => _removeFromShadow(r));
+      _shadowRoots.clear();
+      _shadowPatched = false;
+    }
+    _insertRuleActive  = false;
+    _setPropActive     = false;
+    _adoptedActive     = false;
+    _selPatched        = false;
+    _designModePatched = false;
+  }
+
+  // ════════════════════════════════════════════════════════════════
   // Apply all
   // ════════════════════════════════════════════════════════════════
   function applyAll(phase) {
+    if (!anyActive()) {
+          teardown();
+      return;
+    }
+    _addSentinels();
+    if (!_obs) startObserver();
+    if (!_spaInterval) hookSPANavigation();
     applyCSS();
     clearInlineHandlers();
     if (S.dragdrop)  fixDraggable();
@@ -895,16 +1593,24 @@
     patchConsole();
     patchScroll();
     patchInsertRule();
+    patchStyleSetProperty();
+    patchAdoptedStyleSheets();
+    patchSelection();
+    patchDesignMode();
+    patchPrint();
+    patchGetSelection();
+    patchClipboardContent();
+    patchShadowDOM();
     if (S.devtools)  patchDevtools();
-    if (S.overlays)  autoRemoveOverlays();
+    if (S.overlays)  _idle(autoRemoveOverlays);
     if (phase)       runScripts(phase);
   }
 
   // ════════════════════════════════════════════════════════════════
   // SECURE MESSAGE BUS
   // ════════════════════════════════════════════════════════════════
-  const BUS_IN  = '__op_c2p__';
-  const BUS_OUT = '__op_p2c__';
+  const BUS_IN  = '__wm0__';
+  const BUS_OUT = '__wm1__';
 
   N.AEL.call(window, 'message', function (e) {
     if (!e.data || e.data.__ch !== BUS_IN) return;
@@ -944,27 +1650,33 @@
   }, false);
 
   // ════════════════════════════════════════════════════════════════
-  // Bootstrap v2.2.2
+  // Bootstrap v3.0.0
   // ════════════════════════════════════════════════════════════════
 
   // Phase 1 — document_start (immédiat, avant tout)
-  applyCSS();
-  patchVisibility();
-  patchConsole();
-  hookSPANavigation();
-  runScripts('document_start');
+  // lockPatches() toujours (L1 protections légères, transparentes si inactif).
+  // Le reste est conditionnel : si TOUT est désactivé, on ne démarre rien.
+  lockPatches();
+
+  if (anyActive()) {
+    _addSentinels();   // L4
+    applyCSS();
+    patchVisibility();
+    patchConsole();
+    hookSPANavigation();
+    runScripts('document_start');
+  }
 
   if (document.readyState === 'loading') {
     N.AEL.call(document, 'DOMContentLoaded', () => {
-      applyAll('document_end');
-      startObserver();
+      if (anyActive()) { applyAll('document_end'); startObserver(); }
     }, { once: true });
   } else {
-    applyAll('document_end');
-    startObserver();
+    if (anyActive()) { applyAll('document_end'); startObserver(); }
   }
 
   N.AEL.call(window, 'load', () => {
+    if (!anyActive()) return; // rien à faire
     applyAll('document_idle');
     N.sT(() => { clearInlineHandlers(); if (S.dragdrop) fixDraggable(); }, 300);
     N.sT(() => { clearInlineHandlers(); if (S.overlays) autoRemoveOverlays(); }, 700);
