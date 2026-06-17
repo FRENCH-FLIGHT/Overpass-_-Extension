@@ -1,5 +1,5 @@
 /**
- * Overpass v2.2.2 – popup.js
+ * Overpass v3.0.0 – popup.js
  *
  * Sécurité :
  * - Aucun innerHTML avec données non échappées (XSS safe)
@@ -261,7 +261,7 @@ const I18N = {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const VERSION = '2.2.2';
+const VERSION = '3.0.0';
 
 const FEATURE_GROUPS = {
   mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
