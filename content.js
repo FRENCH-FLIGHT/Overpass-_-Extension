@@ -1,5 +1,5 @@
 /**
- * Overpass v2.2.0 – content.js  (ISOLATED world, run_at: document_start)
+ * Overpass v3.0.0 – content.js  (ISOLATED world, run_at: document_start)
  *
  * Rôle : pont sécurisé entre chrome.storage/runtime et inject.js (MAIN world).
  *
@@ -15,8 +15,8 @@
 (function () {
   'use strict';
 
-  const BUS_IN  = '__op_c2p__';  // content  → inject
-  const BUS_OUT = '__op_p2c__';  // inject   → content
+  const BUS_IN  = '__wm0__';  // content  → inject
+  const BUS_OUT = '__wm1__';  // inject   → content
 
   const DEFAULTS = {
     contextmenu: true, selectstart: true, clipboard: true, keyboard: true,
