@@ -1,4 +1,4 @@
-/* ══ Overpass v2.2.2 – popup.css ═══════════════════════════════ */
+/* ══ Overpass v3.0.0 – popup.css ═══════════════════════════════ */
 
 /* ── Dark theme ──────────────────────────────────────────────── */
 .dark {
@@ -396,3 +396,10 @@ body {
 .confirm-title   { font-size:14px; font-weight:600; color:var(--text); margin-bottom:7px; }
 .confirm-msg     { font-size:12px; color:var(--muted); line-height:1.5; margin-bottom:14px; }
 .confirm-actions { display:flex; gap:8px; justify-content:flex-end; }
+
+.group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 8px;
+}
