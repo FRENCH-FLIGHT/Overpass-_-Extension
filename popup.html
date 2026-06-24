@@ -20,7 +20,7 @@
     </div>
     <div>
       <div class="logo-name">Overpass</div>
-      <div class="logo-sub" id="versionLabel">v3.1.0</div>
+      <div class="logo-sub" id="versionLabel">v3.2.0</div>
     </div>
   </div>
   <div class="header-right">
@@ -383,6 +383,16 @@
   </div>
 
   <div class="settings-section">
+    <div class="settings-label" data-i18n="settingBackup">Sauvegarde</div>
+    <p class="settings-desc" data-i18n="settingBackupDesc">Exportez tous vos réglages (protections, scripts, sites exclus) dans un fichier, ou restaurez une sauvegarde précédente.</p>
+    <div class="settings-row">
+      <button class="pill-btn btn-green" id="btnExportSettings" data-i18n="exportSettings">Exporter</button>
+      <button class="pill-btn btn-ghost" id="btnImportSettings" data-i18n="importSettings">Importer</button>
+    </div>
+    <input type="file" id="importFileInput" accept="application/json,.json" style="display:none"/>
+  </div>
+
+  <div class="settings-section">
     <div class="settings-label danger-label" data-i18n="settingFactory">Réinitialisation</div>
     <p class="settings-desc" data-i18n="settingFactoryDesc">Remet tout à zéro et supprime vos scripts personnalisés.</p>
     <button class="pill-btn btn-red-ghost" id="btnFactoryReset" data-i18n="factoryReset">Restaurer les paramètres usine</button>
@@ -391,7 +401,7 @@
   <div class="settings-section">
     <div class="settings-label" data-i18n="settingAbout">À propos</div>
     <div class="about-card">
-      <div class="about-row"><span class="about-key">Version</span><span class="about-val mono" id="aboutVersion">3.1.0</span></div>
+      <div class="about-row"><span class="about-key">Version</span><span class="about-val mono" id="aboutVersion">3.2.0</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutEngine">Moteur</span><span class="about-val mono">MV3 · MAIN world · L1–L9</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutCompat">Compatibilité</span><span class="about-val mono">Chrome 111+ · Edge 111+</span></div>
       <div class="about-row"><span class="about-key">License</span><span class="about-val mono">MIT</span></div>
