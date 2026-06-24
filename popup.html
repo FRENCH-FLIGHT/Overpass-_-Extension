@@ -4,8 +4,6 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Overpass</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="popup.css"/>
 </head>
 <body class="dark">
@@ -22,11 +20,11 @@
     </div>
     <div>
       <div class="logo-name">Overpass</div>
-      <div class="logo-sub" id="versionLabel">v3.0.0</div>
+      <div class="logo-sub" id="versionLabel">v3.1.0</div>
     </div>
   </div>
   <div class="header-right">
-    <button class="icon-btn-sm" id="btnTheme" title="Basculer thème">
+    <button class="icon-btn-sm" id="btnTheme" data-i18n-title="themeToggle" title="Basculer thème">
       <svg id="iconMoon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <svg id="iconSun"  width="14" height="14" viewBox="0 0 24 24" fill="none" style="display:none"><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/><line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
@@ -36,6 +34,16 @@
     </div>
   </div>
 </header>
+
+<!-- ══ SITE BAR ════════════════════════════════════════════════ -->
+<div class="site-bar" id="siteBar" style="display:none">
+  <svg class="site-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.7"/><line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.7"/><path d="M12 2c2.5 2.7 4 6.3 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.3-4-10s1.5-7.3 4-10z" stroke="currentColor" stroke-width="1.7"/></svg>
+  <span class="site-domain" id="siteDomain"></span>
+  <label class="toggle toggle-sm" id="siteToggleWrap">
+    <input type="checkbox" id="siteActiveToggle" checked/>
+    <span class="slider"></span>
+  </label>
+</div>
 
 <!-- ══ QUICK BAR ══════════════════════════════════════════════ -->
 <div class="quick-bar">
@@ -84,6 +92,10 @@
       <span class="group-icon">🖱️</span>
       <span class="group-title" data-i18n="groupMouse">Souris &amp; Sélection</span>
       <span class="group-count" id="cnt-mouse">0/4</span>
+      <label class="toggle toggle-sm">
+        <input type="checkbox" data-group-toggle="mouse"/>
+        <span class="slider"></span>
+      </label>
     </div>
     <div class="group-body">
       <div class="feature-row">
@@ -123,6 +135,10 @@
       <span class="group-icon">📋</span>
       <span class="group-title" data-i18n="groupClipboard">Copier-coller &amp; Clavier</span>
       <span class="group-count" id="cnt-keyboard">0/3</span>
+      <label class="toggle toggle-sm">
+        <input type="checkbox" data-group-toggle="keyboard"/>
+        <span class="slider"></span>
+      </label>
     </div>
     <div class="group-body">
       <div class="feature-row">
@@ -155,6 +171,10 @@
       <span class="group-icon">📜</span>
       <span class="group-title" data-i18n="groupBehavior">Comportement de page</span>
       <span class="group-count" id="cnt-behavior">0/5</span>
+      <label class="toggle toggle-sm">
+        <input type="checkbox" data-group-toggle="behavior"/>
+        <span class="slider"></span>
+      </label>
     </div>
     <div class="group-body">
       <div class="feature-row">
@@ -201,6 +221,10 @@
       <span class="group-icon">⚙️</span>
       <span class="group-title" data-i18n="groupAdvanced">Avancé</span>
       <span class="group-count" id="cnt-advanced">0/2</span>
+      <label class="toggle toggle-sm">
+        <input type="checkbox" data-group-toggle="advanced"/>
+        <span class="slider"></span>
+      </label>
     </div>
     <div class="group-body">
       <div class="feature-row">
@@ -251,7 +275,10 @@
 <div class="panel" id="panel-overlays">
   <div class="panel-toolbar">
     <span class="panel-info" id="overlayCount" data-i18n="overlayNone">Aucun overlay masqué</span>
-    <button class="pill-btn btn-red-ghost" id="btnRestoreAll" style="display:none" data-i18n="restoreAll">Tout restaurer</button>
+    <div style="display:flex;gap:6px">
+      <button class="pill-btn btn-ghost" id="btnScanOverlays" style="display:none" data-i18n="scanNow">Scanner la page</button>
+      <button class="pill-btn btn-red-ghost" id="btnRestoreAll" style="display:none" data-i18n="restoreAll">Tout restaurer</button>
+    </div>
   </div>
   <div class="overlay-list" id="overlayList">
     <div class="empty-state" id="overlayEmpty">
@@ -281,7 +308,7 @@
   <!-- Éditeur de script (inline, affiché au besoin) -->
   <div class="script-editor" id="scriptEditor" style="display:none">
     <div class="editor-header">
-      <input type="text" class="editor-name" id="editorName" placeholder="Nom du script…" maxlength="60" autocomplete="off"/>
+      <input type="text" class="editor-name" id="editorName" data-i18n-placeholder="scriptNamePlaceholder" placeholder="Nom du script…" maxlength="60" autocomplete="off"/>
       <button class="icon-btn-close" id="btnCloseEditor" aria-label="Fermer">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
@@ -294,15 +321,15 @@
         <option value="document_idle"  data-i18n="runIdle">Chargement complet (images, scripts…)</option>
       </select>
     </div>
-    <textarea class="editor-code" id="editorCode" spellcheck="false"
+    <textarea class="editor-code" id="editorCode" spellcheck="false" data-i18n-placeholder="codePlaceholder"
       placeholder="// Votre JavaScript ici&#10;// Accès complet au contexte de la page&#10;// Exemple : document.title = 'Mon titre';"></textarea>
     <div class="editor-footer">
       <div class="editor-tips">
         <span class="tip-label" data-i18n="examplesLabel">Exemples :</span>
-        <button class="tip-btn" data-snippet="// Supprimer les publicités&#10;document.querySelectorAll('[class*=&quot;ad&quot;],[id*=&quot;ad&quot;],[class*=&quot;pub&quot;]').forEach(el => el.remove());">Suppr. pubs</button>
-        <button class="tip-btn" data-snippet="// Forcer la langue en anglais&#10;document.documentElement.lang = 'en';">Forcer EN</button>
-        <button class="tip-btn" data-snippet="// Rendre toutes les images visibles&#10;document.querySelectorAll('img').forEach(img => {&#10;  img.style.display = 'block';&#10;  img.style.visibility = 'visible';&#10;});">Afficher imgs</button>
-        <button class="tip-btn" data-snippet="// Supprimer les paywalls&#10;document.querySelectorAll('[class*=&quot;paywall&quot;],[class*=&quot;wall&quot;],[class*=&quot;gate&quot;]').forEach(el => el.remove());&#10;document.body.style.overflow = 'auto';">Anti-paywall</button>
+        <button class="tip-btn" data-i18n="snippetAds" data-snippet-key="snippetAdsCode">Suppr. pubs</button>
+        <button class="tip-btn" data-i18n="snippetForceEn" data-snippet-key="snippetForceEnCode">Forcer EN</button>
+        <button class="tip-btn" data-i18n="snippetShowImgs" data-snippet-key="snippetShowImgsCode">Afficher imgs</button>
+        <button class="tip-btn" data-i18n="snippetAntiPaywall" data-snippet-key="snippetAntiPaywallCode">Anti-paywall</button>
       </div>
       <div class="editor-actions">
         <button class="pill-btn btn-red-ghost" id="btnDeleteScript" style="display:none" data-i18n="deleteScript">Supprimer</button>
@@ -340,6 +367,13 @@
   </div>
 
   <div class="settings-section">
+    <div class="settings-label" data-i18n="settingExcluded">Sites exclus</div>
+    <p class="settings-desc" data-i18n="settingExcludedDesc">Désactivez Overpass sur un site via le bandeau en haut du popup ; il apparaîtra ici.</p>
+    <div class="excluded-list" id="excludedList"></div>
+    <p class="empty-sub" id="excludedEmpty" data-i18n="excludedEmptyMsg">Aucun site exclu.</p>
+  </div>
+
+  <div class="settings-section">
     <div class="settings-label" data-i18n="settingDefaults">Paramètres par défaut</div>
     <p class="settings-desc" data-i18n="settingDefaultsDesc">Sauvegardez votre configuration actuelle pour la réappliquer facilement.</p>
     <div class="settings-row">
@@ -357,7 +391,7 @@
   <div class="settings-section">
     <div class="settings-label" data-i18n="settingAbout">À propos</div>
     <div class="about-card">
-      <div class="about-row"><span class="about-key">Version</span><span class="about-val mono" id="aboutVersion">3.0.0</span></div>
+      <div class="about-row"><span class="about-key">Version</span><span class="about-val mono" id="aboutVersion">3.1.0</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutEngine">Moteur</span><span class="about-val mono">MV3 · MAIN world · L1–L9</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutCompat">Compatibilité</span><span class="about-val mono">Chrome 111+ · Edge 111+</span></div>
       <div class="about-row"><span class="about-key">License</span><span class="about-val mono">MIT</span></div>
