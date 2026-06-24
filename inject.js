@@ -1,5 +1,5 @@
 /**
- * Overpass v3.0.0 – inject.js  (world:"MAIN", run_at:"document_start")
+ * Overpass v3.1.0 – inject.js  (world:"MAIN", run_at:"document_start")
  *
  * COUCHES DE BYPASS :
  *  L1  Event.prototype override        ← le plus profond, touche tout
@@ -16,83 +16,6 @@
  *  Token secret fourni par content.js (monde isolé).
  *  Chaque message authentifié + payload limité à 64 Ko.
  *  Payload validé contre une whitelist stricte de clés.
- *
- *  v2.2.2 :
- *  - selectionchange dans EV (bypass sélection plus complet)
- *  - _ON_SEL mis en cache module-level (clearInlineHandlers O(1))
- *  - touch-action:auto ciblé sur les classes scroll-lock CSS communes
- *  - validatePayload : limite de taille 64 Ko
- *  - patchScroll : scrollTo/scrollBy neutralisés quand S.scroll actif
- *  - patchInsertRule : CSS live-lock chirurgical (sélecteurs globaux seulement)
- *  - SPA URL polling 1 Hz en fallback des hooks history API
- *
- *  v2.2.3 (hardening sécurité) :
- *  - lockPatches() : L1+L2 verrouillés non-writable/non-configurable
- *    dès le bootstrap — impossible à écraser via affectation ou
- *    Object.defineProperty, même depuis une iframe fraîche.
- *  - patchStyleSetProperty() : bloque les inline style !important
- *    adversariaux (user-select:none, cursor:none).
- *  - patchAdoptedStyleSheets() : couvre CSSStyleSheet.replaceSync/replace
- *    (vecteur adoptedStyleSheets) avec réinjection CSS défensive.
- *
- *  v2.2.4 (stabilité + discrétion) :
- *  - BUGFIX CRITIQUE : L4 sentinels passive:false → passive:true — élimine
- *    le jank scroll sur toutes les pages (le browser ne peut pas optimiser le
- *    scroll si un listener non-passif existe, même s'il ne fait rien).
- *  - BUGFIX CRITIQUE : lockPatches retire addEventListener/removeEventListener
- *    du verrou — corrige la casse de zone.js/Angular, Vue et SDKs vidéo.
- *  - lockPatches passe à un accesseur {get,set:noop,configurable:true} :
- *    moins de fingerprint, toujours protection contre réaffectation simple.
- *  - patchStyleSetProperty : comparaisons directes sans regex (chemin chaud).
- *  - console.warn('[Overpass]') supprimé, attribut data-op retiré du DOM.
- *  - Flags _patched évitent de re-patcher à chaque applyAll.
- *  - patchSelection() : removeAllRanges/empty bloqués pendant selectionchange.
- *
- *  v2.2.5 (audit complet) :
- *  - BUGFIX : hideOverlay utilisait el.dataset.uaOvId (attribut data-ua-ov-id
- *    visible en DOM = fingerprint extension détectable). Remplacé par WeakMap.
- *  - BUGFIX : _wmap L2 ignorait le flag capture → même wrapper pour bubble/capture,
- *    removeEventListener pouvait rater. Clé composite (fn + capture) désormais.
- *  - NOUVEAU : patchDesignMode() — document.designMode='on' contournait user-select.
- *  - _sendOverlayList debouncé 50ms — évite N postMessages pour N overlays simultanés.
- *  - validatePayload : vérification rapide keys.length avant JSON.stringify.
- *  - hideOverlay appelle N.setProp directement (bypass notre propre patchStyleSetProperty).
- *
- *  v2.2.6 (zéro trace quand inactif) :
- *  - teardown() : nettoyage complet quand toutes les features sont off
- *    (L4 sentinels retirés, MutationObserver déconnecté, SPA interval nettoyé,
- *    <style> retiré, addEventListener natif restauré, selectionchange retiré,
- *    CSS prototypes restaurés, flags _patched réinitialisés).
- *  - anyActive() : gate sur applyAll et bootstrap — aucun overhead si inactif.
- *  - L4 sentinels différés : créés en mémoire, enregistrés/retirés dynamiquement.
- *  - hookSPANavigation / selectionchange listener : références stockées pour teardown.
- *  - Bootstrap : lockPatches() seul si tout désactivé (L1 transparent, aucune trace).
- *
- *  v2.2.7 (hardening + optimisations + furtivité) :
- *  - BUGFIX : patchConsole ne restaurait jamais console.log sur désactivation.
- *  - BUGFIX : _markUserActive listeners (pointerdown/keydown) jamais retirés
- *    par teardown() → trace permanente même inactive. Maintenant conditionnels.
- *  - BUGFIX : hookSPANavigation re-wrappait history.pushState/replaceState à
- *    chaque réactivation après teardown (double wrapping). Flag _spaHooked.
- *  - BUGFIX : patchVisibility ne restaurait jamais hidden/visibilityState.
- *  - NOUVEAU : patchPrint() — window.matchMedia('print') intercepté pour
- *    empêcher la détection d'impression par les sites paywallés.
- *  - Flags sur patchFocus/patchScroll/patchVisibility/patchConsole —
- *    évite toute ré-assignation inutile à chaque applyAll.
- *  - teardown() complété : focus/scroll/visibility/console/matchMedia restaurés.
- *
- *  v2.2.8 (furtivité critique + bypass + perf) :
- *  - STEALTH : nativeToStr passe à WeakMap + Function.prototype.toString patch unique.
- *    Avant : fn.hasOwnProperty('toString') === true (fingerprint détectable).
- *    Après : false, comme les vraies fonctions natives. Aucune own property visible.
- *  - NOUVEAU : Selection.prototype.toString protégé — certains sites le surchargent
- *    pour retourner '' et vider le texte copié malgré la sélection visible.
- *  - BUGFIX : _debTimer et _ovlDebTimer non nettoyés dans teardown() → callbacks
- *    flush/overlayList pouvaient encore se déclencher après désactivation.
- *  - PERF : _ON_ENTRIES en cache module-level — Object.entries(ON) n'est plus
- *    recréé à chaque appel de clearInlineHandlers.
- *  - CORRECTIF : autoRemoveOverlays utilise N.setProp directement (évite l'auto-
- *    interception par patchStyleSetProperty sur les valeurs 'auto').
  */
 (function () {
   'use strict';
@@ -489,7 +412,12 @@
     }
     if (S.cursor) {
       r.push(
-        `*{cursor:auto!important;-webkit-touch-callout:default!important}`,
+        // cursor:default (et non "auto") — "auto" résout nativement en curseur
+        // texte (trait vertical) au survol de texte brut, ce qui cassait
+        // l'affichage sur les pages très textuelles (résultats de recherche…).
+        // "default" neutralise tout aussi bien un cursor:none hostile, sans
+        // cet effet de bord.
+        `*{cursor:default!important;-webkit-touch-callout:default!important}`,
         `a,button,[role="button"],[onclick],[tabindex="0"]{cursor:pointer!important}`,
         `input[type="text"],input[type="search"],input[type="email"],input[type="password"],` +
         `input[type="url"],input[type="number"],textarea,[contenteditable="true"],[contenteditable=""]{cursor:text!important}`,
@@ -629,7 +557,7 @@
       try {
         scope.querySelectorAll(_ON_SEL).forEach(el => {
           // Ne pas toucher aux éléments interactifs ni aux éléments contenteditable
-          if (INTERACTIVE_TAGS.has(el.tagName) || el.isContentEditable) return;
+          if (_INTERACTIVE_TAGS.has(el.tagName) || el.isContentEditable) return;
           _ON_ENTRIES.forEach(([prop, key]) => {
             if (S[key] && el.hasAttribute(prop)) {
               el.removeAttribute(prop);
@@ -1177,7 +1105,7 @@
   // on ajoute une réinjection défensive sur le prochain tick si des
   // règles globales restrictives sont détectées.
   // ════════════════════════════════════════════════════════════════
-  const _RESTRICT_RE = /(html|body|\*)[^{]*\{[^}]*(user-select\s*:\s*none|cursor\s*:\s*none)/i;
+  const _RESTRICT_RE = /(html|body|\*)[^{]*\{[^}]*(user-select\s*:\s*none|cursor\s*:\s*none)/i;
 
   let _adoptedActive = false;
   function patchAdoptedStyleSheets() {
@@ -1472,12 +1400,22 @@
           if (anyActive()) _injectIntoShadow(shadow);
           return shadow;
         }, 'attachShadow');
+        // Scan complet du DOM une seule fois, à l'activation : nécessaire pour
+        // détecter les shadow roots déjà créés avant ce patch. Tout shadow root
+        // créé après est intercepté en direct par attachShadow ci-dessus, donc
+        // répéter un querySelectorAll('*') à chaque applyAll() serait un coût
+        // inutile sur les pages volumineuses.
+        try {
+          document.querySelectorAll('*').forEach(el => {
+            if (el.shadowRoot) _injectIntoShadow(el.shadowRoot);
+          });
+        } catch (_) {}
       }
-      try {
-        document.querySelectorAll('*').forEach(el => {
-          if (el.shadowRoot) _injectIntoShadow(el.shadowRoot);
-        });
-      } catch (_) {}
+      // Rafraîchit le CSS des shadow roots déjà suivis (peu coûteux : itère
+      // seulement _shadowRoots, pas tout le DOM) — nécessaire pour répercuter
+      // un changement de combinaison selectstart/cursor/pointerEvents sans
+      // avoir à refaire le scan complet ci-dessus.
+      _shadowRoots.forEach(_injectIntoShadow);
     } else {
       if (!_shadowPatched) return;
       _shadowPatched = false;
@@ -1650,7 +1588,7 @@
   }, false);
 
   // ════════════════════════════════════════════════════════════════
-  // Bootstrap v3.0.0
+  // Bootstrap v3.1.0
   // ════════════════════════════════════════════════════════════════
 
   // Phase 1 — document_start (immédiat, avant tout)
