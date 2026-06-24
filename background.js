@@ -1,5 +1,5 @@
 /**
- * Overpass v3.1.0 – background.js (Service Worker)
+ * Overpass v3.2.0 – background.js (Service Worker)
  *
  * Responsabilités :
  *   1. Génère et rotation du token d'authentification postMessage
