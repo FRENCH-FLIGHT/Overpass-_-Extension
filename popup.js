@@ -1,5 +1,5 @@
 /**
- * Overpass v3.1.0 – popup.js
+ * Overpass v3.2.0 – popup.js
  *
  * Sécurité :
  * - Aucun innerHTML avec données non échappées (XSS safe)
@@ -64,6 +64,12 @@ const I18N = {
     settingDefaults:'Paramètres par défaut',
     settingDefaultsDesc:'Sauvegardez votre configuration actuelle pour la réappliquer facilement.',
     saveDefaults:'Sauvegarder comme défaut', loadDefaults:'Charger mes défauts',
+    settingBackup:'Sauvegarde',
+    settingBackupDesc:'Exportez tous vos réglages (protections, scripts, sites exclus) dans un fichier, ou restaurez une sauvegarde précédente.',
+    exportSettings:'Exporter', importSettings:'Importer',
+    toastExportDone:'✓ Sauvegarde téléchargée', toastImportDone:'✓ Réglages importés', toastImportError:'Fichier invalide ou illisible',
+    confirmImportTitle:'Importer cette sauvegarde ?',
+    importSummary: (sc, si) => `Cette sauvegarde contient ${sc} script${sc>1?'s':''} personnalisé${sc>1?'s':''} et ${si} site${si>1?'s':''} exclu${si>1?'s':''}. Vos réglages actuels seront remplacés. Continuer ?`,
     settingFactory:'Réinitialisation',
     settingFactoryDesc:'Remet tout à zéro et supprime vos scripts personnalisés.',
     factoryReset:'Restaurer les paramètres usine',
@@ -141,6 +147,12 @@ const I18N = {
     settingDefaults:'Default settings',
     settingDefaultsDesc:'Save your current configuration to easily re-apply it.',
     saveDefaults:'Save as default', loadDefaults:'Load my defaults',
+    settingBackup:'Backup',
+    settingBackupDesc:'Export all your settings (protections, scripts, excluded sites) to a file, or restore a previous backup.',
+    exportSettings:'Export', importSettings:'Import',
+    toastExportDone:'✓ Backup downloaded', toastImportDone:'✓ Settings imported', toastImportError:'Invalid or unreadable file',
+    confirmImportTitle:'Import this backup?',
+    importSummary: (sc, si) => `This backup contains ${sc} custom script${sc>1?'s':''} and ${si} excluded site${si>1?'s':''}. Your current settings will be replaced. Continue?`,
     settingFactory:'Reset',
     settingFactoryDesc:'Reset everything: removes custom scripts and restores original settings.',
     factoryReset:'Restore factory settings',
@@ -218,6 +230,12 @@ const I18N = {
     settingDefaults:'Ajustes por defecto',
     settingDefaultsDesc:'Guarda la configuración actual para reaplicarla fácilmente.',
     saveDefaults:'Guardar como defecto', loadDefaults:'Cargar mis valores',
+    settingBackup:'Copia de seguridad',
+    settingBackupDesc:'Exporta todos tus ajustes (protecciones, scripts, sitios excluidos) a un archivo, o restaura una copia anterior.',
+    exportSettings:'Exportar', importSettings:'Importar',
+    toastExportDone:'✓ Copia descargada', toastImportDone:'✓ Ajustes importados', toastImportError:'Archivo inválido o ilegible',
+    confirmImportTitle:'¿Importar esta copia de seguridad?',
+    importSummary: (sc, si) => `Esta copia contiene ${sc} script${sc>1?'s':''} personalizado${sc>1?'s':''} y ${si} sitio${si>1?'s':''} excluido${si>1?'s':''}. Tus ajustes actuales serán reemplazados. ¿Continuar?`,
     settingFactory:'Restablecimiento',
     settingFactoryDesc:'Reinicia todo: elimina scripts y restaura ajustes originales.',
     factoryReset:'Restaurar ajustes de fábrica',
@@ -295,6 +313,12 @@ const I18N = {
     settingDefaults:'Standardeinstellungen',
     settingDefaultsDesc:'Aktuelle Konfiguration speichern um sie einfach wiederherzustellen.',
     saveDefaults:'Als Standard speichern', loadDefaults:'Meine Standards laden',
+    settingBackup:'Sicherung',
+    settingBackupDesc:'Exportiere alle deine Einstellungen (Schutzfunktionen, Skripte, ausgeschlossene Seiten) in eine Datei oder stelle eine frühere Sicherung wieder her.',
+    exportSettings:'Exportieren', importSettings:'Importieren',
+    toastExportDone:'✓ Sicherung heruntergeladen', toastImportDone:'✓ Einstellungen importiert', toastImportError:'Ungültige oder unlesbare Datei',
+    confirmImportTitle:'Diese Sicherung importieren?',
+    importSummary: (sc, si) => `Diese Sicherung enthält ${sc} benutzerdefiniertes Skript${sc>1?'e':''} und ${si} ausgeschlossene Seite${si>1?'n':''}. Deine aktuellen Einstellungen werden ersetzt. Fortfahren?`,
     settingFactory:'Zurücksetzen',
     settingFactoryDesc:'Alles zurücksetzen: löscht Skripte und stellt Originaleinstellungen wieder her.',
     factoryReset:'Werkseinstellungen',
@@ -325,7 +349,7 @@ const I18N = {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const VERSION = '3.1.0';
+const VERSION = '3.2.0';
 
 const FEATURE_GROUPS = {
   mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
@@ -469,12 +493,12 @@ function toast(msg, type = 'ok', ms = 1900) {
 // ════════════════════════════════════════════════════════════════
 // CONFIRM MODAL (sécurisé : textContent uniquement)
 // ════════════════════════════════════════════════════════════════
-function showConfirm(titleKey, msgKey) {
+function showConfirm(titleKey, msgKey, rawMsg = null) {
   return new Promise(resolve => {
     const bd = document.getElementById('modalBackdrop');
     if (!bd) { resolve(false); return; }
     setText(document.getElementById('confirmTitle'), t(titleKey));
-    setText(document.getElementById('confirmMsg'),   t(msgKey));
+    setText(document.getElementById('confirmMsg'),   rawMsg ?? t(msgKey));
     setText(document.getElementById('confirmYes'),   t('confirmYes'));
     setText(document.getElementById('confirmNo'),    t('confirmCancel'));
     bd.style.display = 'flex';
@@ -955,6 +979,107 @@ function applyTheme(newTheme) {
   chrome.storage.sync.set({ theme: newTheme });
 }
 
+// ════════════════════════════════════════════════════════════════
+// EXPORT / IMPORT — sauvegarde complète des réglages
+// ════════════════════════════════════════════════════════════════
+function exportSettings() {
+  const settings = {};
+  Object.keys(FACTORY_DEFAULTS).forEach(k => { settings[k] = !!cfg[k]; });
+
+  const data = {
+    _meta: { app: 'Overpass', version: VERSION, exportedAt: new Date().toISOString() },
+    settings,
+    customScripts: cfg.customScripts || [],
+    excludedSites,
+    language: lang,
+    theme,
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `overpass-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(t('toastExportDone'));
+}
+
+// Valide et nettoie le contenu d'un fichier de sauvegarde avant tout usage —
+// même logique défensive que pour les payloads overlays/scripts déjà en place
+// (on ne fait jamais confiance aveuglément à un fichier externe).
+function parseBackupFile(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (_) { return null; }
+  if (!data || typeof data !== 'object') return null;
+
+  const settings = {};
+  if (data.settings && typeof data.settings === 'object') {
+    Object.keys(FACTORY_DEFAULTS).forEach(k => {
+      if (k in data.settings) settings[k] = !!data.settings[k];
+    });
+  }
+
+  let customScripts = [];
+  if (Array.isArray(data.customScripts)) {
+    customScripts = data.customScripts
+      .filter(s => s && typeof s === 'object' && typeof s.code === 'string')
+      .map(s => ({
+        id: typeof s.id === 'string' && s.id ? s.id : `sc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: typeof s.name === 'string' && s.name.trim() ? s.name.slice(0, 60) : t('defaultScriptName'),
+        code: s.code,
+        runAt: ['document_start', 'document_end', 'document_idle'].includes(s.runAt) ? s.runAt : 'document_idle',
+        enabled: !!s.enabled,
+      }));
+  }
+
+  let excludedSitesImported = [];
+  if (Array.isArray(data.excludedSites)) {
+    excludedSitesImported = data.excludedSites.filter(h => typeof h === 'string' && h.length > 0 && h.length < 256);
+  }
+
+  const language = ['fr', 'en', 'es', 'de'].includes(data.language) ? data.language : null;
+  const theme    = ['dark', 'light'].includes(data.theme) ? data.theme : null;
+
+  return { settings, customScripts, excludedSites: excludedSitesImported, language, theme };
+}
+
+async function handleImportFile(file) {
+  if (!file) return;
+  let text;
+  try { text = await file.text(); } catch (_) { toast(t('toastImportError'), 'err'); return; }
+
+  const parsed = parseBackupFile(text);
+  if (!parsed) { toast(t('toastImportError'), 'err'); return; }
+
+  const ok = await showConfirm(
+    'confirmImportTitle', null,
+    t('importSummary', parsed.customScripts.length, parsed.excludedSites.length)
+  );
+  if (!ok) return;
+
+  // Toggles + scripts : passe par applySettings (application live immédiate,
+  // puis persistance — même chemin que tous les autres réglages).
+  await applySettings({ ...parsed.settings, customScripts: parsed.customScripts });
+
+  // excludedSites / language / theme : remplacement complet (une restauration
+  // de sauvegarde doit refléter exactement l'état sauvegardé, pas le fusionner).
+  excludedSites = parsed.excludedSites;
+  const toStore = { excludedSites };
+  if (parsed.language) { lang = parsed.language; toStore.language = lang; }
+  if (parsed.theme)    { theme = parsed.theme;   toStore.theme    = theme; }
+  try { await chrome.storage.sync.set(toStore); } catch (_) {}
+
+  if (parsed.language) applyI18n();
+  if (parsed.theme)    applyTheme(theme);
+  updateSiteBar();
+  renderExcludedList();
+
+  toast(t('toastImportDone'));
+}
+
 function initSettings() {
   // Langue
   document.querySelectorAll('.lang-btn').forEach(btn => {
@@ -995,6 +1120,17 @@ function initSettings() {
       applySettings(safe);
       toast(t('toastDefaultsLoaded'));
     } catch (_) { toast(t('readError'), 'err'); }
+  });
+
+  // Export / Import
+  document.getElementById('btnExportSettings')?.addEventListener('click', exportSettings);
+  document.getElementById('btnImportSettings')?.addEventListener('click', () => {
+    document.getElementById('importFileInput')?.click();
+  });
+  document.getElementById('importFileInput')?.addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    await handleImportFile(file);
+    e.target.value = ''; // permet de réimporter le même fichier ensuite
   });
 
   // Reset usine — applique sur la page immédiatement, persiste ensuite
