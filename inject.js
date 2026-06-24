@@ -1,5 +1,5 @@
 /**
- * Overpass v3.1.0 – inject.js  (world:"MAIN", run_at:"document_start")
+ * Overpass v3.2.0 – inject.js  (world:"MAIN", run_at:"document_start")
  *
  * COUCHES DE BYPASS :
  *  L1  Event.prototype override        ← le plus profond, touche tout
@@ -1588,7 +1588,7 @@
   }, false);
 
   // ════════════════════════════════════════════════════════════════
-  // Bootstrap v3.1.0
+  // Bootstrap v3.2.0
   // ════════════════════════════════════════════════════════════════
 
   // Phase 1 — document_start (immédiat, avant tout)
