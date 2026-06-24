@@ -1,5 +1,5 @@
 /**
- * Overpass v3.0.0 – popup.js
+ * Overpass v3.1.0 – popup.js
  *
  * Sécurité :
  * - Aucun innerHTML avec données non échappées (XSS safe)
@@ -20,6 +20,7 @@ const I18N = {
     tabScripts:'Scripts', tabSettings:'Paramètres',
     groupMouse:'Souris & Sélection', groupClipboard:'Copier-coller & Clavier',
     groupBehavior:'Comportement de page', groupAdvanced:'Avancé', groupTools:'Outils rapides',
+    groupToggleAll:'Tout activer/désactiver ce groupe',
     fContextmenu:'Clic droit', dContextmenu:'Réactive le menu qui apparaît avec un clic droit',
     fSelectstart:'Sélection de texte', dSelectstart:'Permet de surligner et copier du texte sur les sites qui le bloquent',
     fCursor:'Curseur de souris', dCursor:"Force l'affichage du curseur quand un site le cache",
@@ -36,10 +37,18 @@ const I18N = {
     fConsole:'Protéger la console', dConsole:"Empêche le site d'effacer les messages dans la console",
     experimental:'Expérimental',
     toolSource:'Code source', toolCopyUrl:'Copier URL', toolIncognito:'Incognito',
-    overlayNone:'Aucun overlay masqué', restoreAll:'Tout restaurer',
+    overlayNone:'Aucun overlay masqué', restoreAll:'Tout restaurer', scanNow:'Scanner la page',
     overlayEmptyMsg:'Aucun overlay supprimé.', overlayEmptyHint:'Activez la suppression auto ou utilisez Cibler.',
     overlayAuto:'Auto', overlayManual:'Manuel',
     newScript:'Nouveau script', examplesLabel:'Exemples :',
+    scriptNamePlaceholder:'Nom du script…', defaultScriptName:'Script',
+    codePlaceholder:"// Votre JavaScript ici\n// Accès complet au contexte de la page\n// Exemple : document.title = 'Mon titre';",
+    snippetAds:'Suppr. pubs', snippetForceEn:'Forcer EN', snippetShowImgs:'Afficher imgs', snippetAntiPaywall:'Anti-paywall',
+    snippetAdsCode:"// Supprimer les publicités\ndocument.querySelectorAll('[class*=\"ad\"],[id*=\"ad\"],[class*=\"pub\"]').forEach(el => el.remove());",
+    snippetForceEnCode:"// Forcer la langue en anglais\ndocument.documentElement.lang = 'en';",
+    snippetShowImgsCode:"// Rendre toutes les images visibles\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
+    snippetAntiPaywallCode:"// Supprimer les paywalls\ndocument.querySelectorAll('[class*=\"paywall\"],[class*=\"wall\"],[class*=\"gate\"]').forEach(el => el.remove());\ndocument.body.style.overflow = 'auto';",
+    themeToggle:'Basculer thème',
     scriptEmptyMsg:'Aucun script personnalisé.', scriptEmptyHint:"Créez des scripts JS qui s'exécutent sur chaque page.",
     runAtLabel:"Moment d'exécution :",
     runStart:'Au démarrage — avant le contenu',
@@ -48,6 +57,10 @@ const I18N = {
     deleteScript:'Supprimer', saveScript:'Enregistrer',
     settingLanguage:'Langue / Language', settingTheme:'Apparence',
     themeDark:'Sombre', themeLight:'Clair',
+    siteToggleTitle:'Actif sur ce site', toastSiteExcluded:'✓ Désactivé sur ce site', toastSiteIncluded:'✓ Réactivé sur ce site',
+    settingExcluded:'Sites exclus',
+    settingExcludedDesc:'Désactivez Overpass sur un site via le bandeau en haut du popup ; il apparaîtra ici.',
+    excludedEmptyMsg:'Aucun site exclu.', removeSite:'Retirer',
     settingDefaults:'Paramètres par défaut',
     settingDefaultsDesc:'Sauvegardez votre configuration actuelle pour la réappliquer facilement.',
     saveDefaults:'Sauvegarder comme défaut', loadDefaults:'Charger mes défauts',
@@ -59,7 +72,7 @@ const I18N = {
     toastEnabled:'✓ Tout activé !', toastDisabled:'Tout désactivé',
     toastDefaultsSaved:'✓ Défauts sauvegardés', toastDefaultsLoaded:'✓ Défauts chargés',
     toastFactoryDone:'✓ Paramètres usine restaurés', toastUrlCopied:'✓ URL copiée',
-    toastOverlayRestored:'✓ Overlay restauré', toastAllRestored:'✓ Tous restaurés',
+    toastOverlayRestored:'✓ Overlay restauré', toastAllRestored:'✓ Tous restaurés', toastScanDone:'🔍 Scan effectué',
     toastScriptSaved:'✓ Script enregistré', toastScriptDeleted:'Script supprimé',
     toastPicker:'🎯 Cliquez sur un élément…', toastPickerDone:'✓ Élément masqué',
     toastPickerCancelled:'Ciblage annulé', toastCantOpen:'Impossible sur cette page',
@@ -70,6 +83,9 @@ const I18N = {
     confirmDeleteTitle:'Supprimer le script',
     confirmDeleteMsg:'Cette action est irréversible.',
     confirmYes:'Confirmer', confirmCancel:'Annuler',
+    closeEditor:'Fermer', restoreOne:'Restaurer',
+    unnamedScript:'Sans nom', unknownElement:'(inconnu)',
+    emptyCode:'Code vide', readError:'Erreur de lecture',
     overlayX: n => `${n} overlay${n>1?'s':''} masqué${n>1?'s':''}`,
     ago: s => s < 60 ? `il y a ${s}s` : `il y a ${Math.floor(s/60)}min`,
   },
@@ -81,6 +97,7 @@ const I18N = {
     tabScripts:'Scripts', tabSettings:'Settings',
     groupMouse:'Mouse & Selection', groupClipboard:'Clipboard & Keyboard',
     groupBehavior:'Page Behavior', groupAdvanced:'Advanced', groupTools:'Quick Tools',
+    groupToggleAll:'Toggle entire group',
     fContextmenu:'Right-click', dContextmenu:'Re-enables the native context menu',
     fSelectstart:'Text selection', dSelectstart:'Allows highlighting and copying text on restrictive sites',
     fCursor:'Mouse cursor', dCursor:'Forces cursor display when a site hides it',
@@ -97,10 +114,18 @@ const I18N = {
     fConsole:'Protect console', dConsole:'Prevents the site from clearing console messages',
     experimental:'Experimental',
     toolSource:'Source code', toolCopyUrl:'Copy URL', toolIncognito:'Incognito',
-    overlayNone:'No overlays hidden', restoreAll:'Restore all',
+    overlayNone:'No overlays hidden', restoreAll:'Restore all', scanNow:'Scan page',
     overlayEmptyMsg:'No overlays removed.', overlayEmptyHint:'Enable auto removal or use the Pick button.',
     overlayAuto:'Auto', overlayManual:'Manual',
     newScript:'New script', examplesLabel:'Examples:',
+    scriptNamePlaceholder:'Script name…', defaultScriptName:'Script',
+    codePlaceholder:"// Your JavaScript here\n// Full access to the page context\n// Example: document.title = 'My title';",
+    snippetAds:'Remove ads', snippetForceEn:'Force EN', snippetShowImgs:'Show images', snippetAntiPaywall:'Anti-paywall',
+    snippetAdsCode:"// Remove ads\ndocument.querySelectorAll('[class*=\"ad\"],[id*=\"ad\"],[class*=\"pub\"]').forEach(el => el.remove());",
+    snippetForceEnCode:"// Force English language\ndocument.documentElement.lang = 'en';",
+    snippetShowImgsCode:"// Make all images visible\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
+    snippetAntiPaywallCode:"// Remove paywalls\ndocument.querySelectorAll('[class*=\"paywall\"],[class*=\"wall\"],[class*=\"gate\"]').forEach(el => el.remove());\ndocument.body.style.overflow = 'auto';",
+    themeToggle:'Toggle theme',
     scriptEmptyMsg:'No custom scripts yet.', scriptEmptyHint:'Create JS scripts that run automatically on every page.',
     runAtLabel:'Execution timing:',
     runStart:'On start — before page content',
@@ -109,6 +134,10 @@ const I18N = {
     deleteScript:'Delete', saveScript:'Save',
     settingLanguage:'Language / Langue', settingTheme:'Appearance',
     themeDark:'Dark', themeLight:'Light',
+    siteToggleTitle:'Active on this site', toastSiteExcluded:'✓ Disabled on this site', toastSiteIncluded:'✓ Re-enabled on this site',
+    settingExcluded:'Excluded sites',
+    settingExcludedDesc:'Disable Overpass on a site using the banner at the top of the popup; it will appear here.',
+    excludedEmptyMsg:'No excluded sites.', removeSite:'Remove',
     settingDefaults:'Default settings',
     settingDefaultsDesc:'Save your current configuration to easily re-apply it.',
     saveDefaults:'Save as default', loadDefaults:'Load my defaults',
@@ -120,7 +149,7 @@ const I18N = {
     toastEnabled:'✓ All enabled!', toastDisabled:'All disabled',
     toastDefaultsSaved:'✓ Defaults saved', toastDefaultsLoaded:'✓ Defaults loaded',
     toastFactoryDone:'✓ Factory reset done', toastUrlCopied:'✓ URL copied',
-    toastOverlayRestored:'✓ Overlay restored', toastAllRestored:'✓ All restored',
+    toastOverlayRestored:'✓ Overlay restored', toastAllRestored:'✓ All restored', toastScanDone:'🔍 Scan complete',
     toastScriptSaved:'✓ Script saved', toastScriptDeleted:'Script deleted',
     toastPicker:'🎯 Click an element…', toastPickerDone:'✓ Element hidden',
     toastPickerCancelled:'Pick cancelled', toastCantOpen:'Not available on this page',
@@ -131,6 +160,9 @@ const I18N = {
     confirmDeleteTitle:'Delete script',
     confirmDeleteMsg:'This action is irreversible.',
     confirmYes:'Confirm', confirmCancel:'Cancel',
+    closeEditor:'Close', restoreOne:'Restore',
+    unnamedScript:'Unnamed', unknownElement:'(unknown)',
+    emptyCode:'Empty code', readError:'Read error',
     overlayX: n => `${n} overlay${n>1?'s':''} hidden`,
     ago: s => s < 60 ? `${s}s ago` : `${Math.floor(s/60)}min ago`,
   },
@@ -142,6 +174,7 @@ const I18N = {
     tabScripts:'Scripts', tabSettings:'Ajustes',
     groupMouse:'Ratón y Selección', groupClipboard:'Portapapeles y Teclado',
     groupBehavior:'Comportamiento', groupAdvanced:'Avanzado', groupTools:'Herramientas',
+    groupToggleAll:'Activar/desactivar todo el grupo',
     fContextmenu:'Clic derecho', dContextmenu:'Reactiva el menú contextual nativo',
     fSelectstart:'Selección de texto', dSelectstart:'Permite resaltar y copiar texto en sitios restrictivos',
     fCursor:'Cursor', dCursor:'Fuerza la visibilidad del cursor',
@@ -158,10 +191,18 @@ const I18N = {
     fConsole:'Proteger consola', dConsole:'Evita que el sitio borre los mensajes de consola',
     experimental:'Experimental',
     toolSource:'Código fuente', toolCopyUrl:'Copiar URL', toolIncognito:'Incógnito',
-    overlayNone:'Sin overlays ocultos', restoreAll:'Restaurar todo',
+    overlayNone:'Sin overlays ocultos', restoreAll:'Restaurar todo', scanNow:'Escanear página',
     overlayEmptyMsg:'No hay overlays eliminados.', overlayEmptyHint:'Activa la eliminación auto o usa Selec.',
     overlayAuto:'Auto', overlayManual:'Manual',
     newScript:'Nuevo script', examplesLabel:'Ejemplos:',
+    scriptNamePlaceholder:'Nombre del script…', defaultScriptName:'Script',
+    codePlaceholder:"// Tu JavaScript aquí\n// Acceso completo al contexto de la página\n// Ejemplo: document.title = 'Mi título';",
+    snippetAds:'Quitar anuncios', snippetForceEn:'Forzar EN', snippetShowImgs:'Mostrar imgs', snippetAntiPaywall:'Anti-paywall',
+    snippetAdsCode:"// Quitar anuncios\ndocument.querySelectorAll('[class*=\"ad\"],[id*=\"ad\"],[class*=\"pub\"]').forEach(el => el.remove());",
+    snippetForceEnCode:"// Forzar idioma inglés\ndocument.documentElement.lang = 'en';",
+    snippetShowImgsCode:"// Mostrar todas las imágenes\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
+    snippetAntiPaywallCode:"// Quitar paywalls\ndocument.querySelectorAll('[class*=\"paywall\"],[class*=\"wall\"],[class*=\"gate\"]').forEach(el => el.remove());\ndocument.body.style.overflow = 'auto';",
+    themeToggle:'Cambiar tema',
     scriptEmptyMsg:'Sin scripts personalizados.', scriptEmptyHint:'Crea scripts JS que se ejecuten en cada página.',
     runAtLabel:'Momento de ejecución:',
     runStart:'Al inicio — antes del contenido',
@@ -170,6 +211,10 @@ const I18N = {
     deleteScript:'Eliminar', saveScript:'Guardar',
     settingLanguage:'Idioma / Language', settingTheme:'Apariencia',
     themeDark:'Oscuro', themeLight:'Claro',
+    siteToggleTitle:'Activo en este sitio', toastSiteExcluded:'✓ Desactivado en este sitio', toastSiteIncluded:'✓ Reactivado en este sitio',
+    settingExcluded:'Sitios excluidos',
+    settingExcludedDesc:'Desactiva Overpass en un sitio con el banner superior; aparecerá aquí.',
+    excludedEmptyMsg:'Sin sitios excluidos.', removeSite:'Quitar',
     settingDefaults:'Ajustes por defecto',
     settingDefaultsDesc:'Guarda la configuración actual para reaplicarla fácilmente.',
     saveDefaults:'Guardar como defecto', loadDefaults:'Cargar mis valores',
@@ -181,7 +226,7 @@ const I18N = {
     toastEnabled:'✓ ¡Todo activado!', toastDisabled:'Todo desactivado',
     toastDefaultsSaved:'✓ Valores guardados', toastDefaultsLoaded:'✓ Valores cargados',
     toastFactoryDone:'✓ Restablecido', toastUrlCopied:'✓ URL copiada',
-    toastOverlayRestored:'✓ Overlay restaurado', toastAllRestored:'✓ Todo restaurado',
+    toastOverlayRestored:'✓ Overlay restaurado', toastAllRestored:'✓ Todo restaurado', toastScanDone:'🔍 Escaneo completo',
     toastScriptSaved:'✓ Script guardado', toastScriptDeleted:'Script eliminado',
     toastPicker:'🎯 Haz clic en un elemento…', toastPickerDone:'✓ Elemento oculto',
     toastPickerCancelled:'Selección cancelada', toastCantOpen:'No disponible en esta página',
@@ -192,6 +237,9 @@ const I18N = {
     confirmDeleteTitle:'Eliminar script',
     confirmDeleteMsg:'Esta acción es irreversible.',
     confirmYes:'Confirmar', confirmCancel:'Cancelar',
+    closeEditor:'Cerrar', restoreOne:'Restaurar',
+    unnamedScript:'Sin nombre', unknownElement:'(desconocido)',
+    emptyCode:'Código vacío', readError:'Error de lectura',
     overlayX: n => `${n} overlay${n>1?'s':''} oculto${n>1?'s':''}`,
     ago: s => s < 60 ? `hace ${s}s` : `hace ${Math.floor(s/60)}min`,
   },
@@ -203,6 +251,7 @@ const I18N = {
     tabScripts:'Skripte', tabSettings:'Einstellungen',
     groupMouse:'Maus & Auswahl', groupClipboard:'Zwischenablage & Tastatur',
     groupBehavior:'Seitenverhalten', groupAdvanced:'Erweitert', groupTools:'Schnelltools',
+    groupToggleAll:'Gesamte Gruppe umschalten',
     fContextmenu:'Rechtsklick', dContextmenu:'Reaktiviert das native Kontextmenü',
     fSelectstart:'Textauswahl', dSelectstart:'Ermöglicht Markieren und Kopieren auf blockierenden Seiten',
     fCursor:'Mauszeiger', dCursor:'Erzwingt die Anzeige des Mauszeigers',
@@ -219,10 +268,18 @@ const I18N = {
     fConsole:'Konsolenschutz', dConsole:'Verhindert dass die Seite Konsolenmeldungen löscht',
     experimental:'Experimentell',
     toolSource:'Quellcode', toolCopyUrl:'URL kopieren', toolIncognito:'Privat',
-    overlayNone:'Keine Overlays ausgeblendet', restoreAll:'Alle wiederherstellen',
+    overlayNone:'Keine Overlays ausgeblendet', restoreAll:'Alle wiederherstellen', scanNow:'Seite scannen',
     overlayEmptyMsg:'Keine Overlays ausgeblendet.', overlayEmptyHint:'Auto-Entfernung aktivieren oder Auswahl-Button nutzen.',
     overlayAuto:'Auto', overlayManual:'Manuell',
     newScript:'Neues Skript', examplesLabel:'Beispiele:',
+    scriptNamePlaceholder:'Skriptname…', defaultScriptName:'Skript',
+    codePlaceholder:"// Dein JavaScript hier\n// Vollständiger Zugriff auf den Seitenkontext\n// Beispiel: document.title = 'Mein Titel';",
+    snippetAds:'Werbung entf.', snippetForceEn:'EN erzwingen', snippetShowImgs:'Bilder zeigen', snippetAntiPaywall:'Anti-Paywall',
+    snippetAdsCode:"// Werbung entfernen\ndocument.querySelectorAll('[class*=\"ad\"],[id*=\"ad\"],[class*=\"pub\"]').forEach(el => el.remove());",
+    snippetForceEnCode:"// Englische Sprache erzwingen\ndocument.documentElement.lang = 'en';",
+    snippetShowImgsCode:"// Alle Bilder sichtbar machen\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
+    snippetAntiPaywallCode:"// Paywalls entfernen\ndocument.querySelectorAll('[class*=\"paywall\"],[class*=\"wall\"],[class*=\"gate\"]').forEach(el => el.remove());\ndocument.body.style.overflow = 'auto';",
+    themeToggle:'Theme wechseln',
     scriptEmptyMsg:'Keine benutzerdefinierten Skripte.', scriptEmptyHint:'Erstelle JS-Skripte die automatisch auf jeder Seite laufen.',
     runAtLabel:'Ausführungszeitpunkt:',
     runStart:'Beim Start — vor dem Seiteninhalt',
@@ -231,6 +288,10 @@ const I18N = {
     deleteScript:'Löschen', saveScript:'Speichern',
     settingLanguage:'Sprache / Language', settingTheme:'Erscheinungsbild',
     themeDark:'Dunkel', themeLight:'Hell',
+    siteToggleTitle:'Aktiv auf dieser Seite', toastSiteExcluded:'✓ Auf dieser Seite deaktiviert', toastSiteIncluded:'✓ Auf dieser Seite reaktiviert',
+    settingExcluded:'Ausgeschlossene Seiten',
+    settingExcludedDesc:'Deaktiviere Overpass über die Leiste oben im Popup; die Seite erscheint dann hier.',
+    excludedEmptyMsg:'Keine ausgeschlossenen Seiten.', removeSite:'Entfernen',
     settingDefaults:'Standardeinstellungen',
     settingDefaultsDesc:'Aktuelle Konfiguration speichern um sie einfach wiederherzustellen.',
     saveDefaults:'Als Standard speichern', loadDefaults:'Meine Standards laden',
@@ -242,7 +303,7 @@ const I18N = {
     toastEnabled:'✓ Alles aktiviert!', toastDisabled:'Alles deaktiviert',
     toastDefaultsSaved:'✓ Standards gespeichert', toastDefaultsLoaded:'✓ Standards geladen',
     toastFactoryDone:'✓ Zurückgesetzt', toastUrlCopied:'✓ URL kopiert',
-    toastOverlayRestored:'✓ Overlay wiederhergestellt', toastAllRestored:'✓ Alle wiederhergestellt',
+    toastOverlayRestored:'✓ Overlay wiederhergestellt', toastAllRestored:'✓ Alle wiederhergestellt', toastScanDone:'🔍 Scan abgeschlossen',
     toastScriptSaved:'✓ Skript gespeichert', toastScriptDeleted:'Skript gelöscht',
     toastPicker:'🎯 Element anklicken…', toastPickerDone:'✓ Element ausgeblendet',
     toastPickerCancelled:'Auswahl abgebrochen', toastCantOpen:'Auf dieser Seite nicht verfügbar',
@@ -253,6 +314,9 @@ const I18N = {
     confirmDeleteTitle:'Skript löschen',
     confirmDeleteMsg:'Diese Aktion ist nicht rückgängig zu machen.',
     confirmYes:'Bestätigen', confirmCancel:'Abbrechen',
+    closeEditor:'Schließen', restoreOne:'Wiederherstellen',
+    unnamedScript:'Unbenannt', unknownElement:'(unbekannt)',
+    emptyCode:'Code leer', readError:'Lesefehler',
     overlayX: n => `${n} Overlay${n>1?'s':''} ausgeblendet`,
     ago: s => s < 60 ? `vor ${s}s` : `vor ${Math.floor(s/60)}min`,
   },
@@ -261,7 +325,7 @@ const I18N = {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const VERSION = '3.0.0';
+const VERSION = '3.1.0';
 
 const FEATURE_GROUPS = {
   mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
@@ -285,8 +349,10 @@ let lang     = 'fr';
 let theme    = 'dark';
 let tabId    = null;
 let pickerOn = false;
-let editingScriptId = null;
-let toastTimer = null;
+let editingScriptId  = null;
+let toastTimer       = null;
+let excludedSites    = [];
+let currentHostname  = '';
 
 // ════════════════════════════════════════════════════════════════
 // HELPERS
@@ -312,6 +378,80 @@ function setText(el, text) { if (el) el.textContent = String(text); }
 
 function syncing(on) {
   document.getElementById('syncDot')?.classList.toggle('syncing', on);
+}
+
+function getHostname(url) {
+  try { return new URL(url).hostname || ''; } catch (_) { return ''; }
+}
+
+// ════════════════════════════════════════════════════════════════
+// SITE BAR — exclusion d'Overpass sur le site de l'onglet actif
+// ════════════════════════════════════════════════════════════════
+function updateSiteBar() {
+  const bar = document.getElementById('siteBar');
+  const inp = document.getElementById('siteActiveToggle');
+  const domainEl = document.getElementById('siteDomain');
+  if (!bar || !inp || !domainEl || !currentHostname) return;
+  const excluded = excludedSites.includes(currentHostname);
+  inp.checked = !excluded;
+  bar.classList.toggle('excluded', excluded);
+  domainEl.textContent = currentHostname;
+  domainEl.title = currentHostname;
+}
+
+async function setSiteExcluded(excluded) {
+  if (!currentHostname) return;
+  excludedSites = excluded
+    ? [...new Set([...excludedSites, currentHostname])]
+    : excludedSites.filter(h => h !== currentHostname);
+  await chrome.storage.sync.set({ excludedSites });
+  updateSiteBar();
+  renderExcludedList();
+  toast(t(excluded ? 'toastSiteExcluded' : 'toastSiteIncluded'), excluded ? 'info' : 'ok');
+}
+
+function initSiteBar() {
+  const bar = document.getElementById('siteBar');
+  const inp = document.getElementById('siteActiveToggle');
+  if (!bar || !inp) return;
+  if (!currentHostname) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  inp.addEventListener('change', () => setSiteExcluded(!inp.checked));
+}
+
+function renderExcludedList() {
+  const container = document.getElementById('excludedList');
+  const empty = document.getElementById('excludedEmpty');
+  if (!container) return;
+  container.innerHTML = '';
+  if (excludedSites.length === 0) {
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  [...excludedSites].sort().forEach(host => {
+    const item = document.createElement('div');
+    item.className = 'excluded-item';
+
+    const span = document.createElement('span');
+    span.textContent = host; // textContent = safe
+    span.title = host;
+
+    const btn = document.createElement('button');
+    btn.className = 'excluded-remove';
+    btn.title = t('removeSite');
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+    btn.addEventListener('click', async () => {
+      excludedSites = excludedSites.filter(h => h !== host);
+      await chrome.storage.sync.set({ excludedSites });
+      renderExcludedList();
+      updateSiteBar();
+    });
+
+    item.appendChild(span);
+    item.appendChild(btn);
+    container.appendChild(item);
+  });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -358,6 +498,13 @@ async function send(action, extra = {}) {
 
 // ════════════════════════════════════════════════════════════════
 // APPLY SETTINGS
+//
+// IMPORTANT : on envoie le message d'application à la page AVANT
+// d'écrire dans chrome.storage.sync. chrome.storage.sync peut être
+// lent (synchro réseau, quotas de débit) — l'attendre avant d'agir
+// sur la page donnait l'impression qu'un toggle ne prenait effet
+// qu'après un rechargement manuel. La page est maintenant mise à
+// jour immédiatement ; la persistance se fait en arrière-plan.
 // ════════════════════════════════════════════════════════════════
 async function applySettings(patch) {
   // Valider que patch ne contient que des clés autorisées
@@ -365,10 +512,23 @@ async function applySettings(patch) {
   const allowed = new Set([...Object.keys(FACTORY_DEFAULTS), 'customScripts']);
   Object.keys(patch).forEach(k => { if (allowed.has(k)) safe[k] = patch[k]; });
   cfg = { ...cfg, ...safe };
-  syncing(true);
-  await chrome.storage.sync.set({ ...cfg, customScripts: JSON.stringify(cfg.customScripts) });
-  await send('updateSettings', { settings: cfg });
+
   updateUI();
+  send('updateSettings', { settings: cfg }); // application immédiate, non bloquante
+
+  syncing(true);
+  try {
+    // storage.sync.set fait un merge partiel (les clés non fournies restent
+    // inchangées) : on n'écrit donc que les clés réellement modifiées par ce
+    // patch, au lieu de l'intégralité de cfg — ce qui évite de réécrire la
+    // chaîne JSON des scripts personnalisés à chaque simple bascule de case.
+    const toStore = { ...safe };
+    if ('customScripts' in toStore) toStore.customScripts = JSON.stringify(toStore.customScripts);
+    await chrome.storage.sync.set(toStore);
+  } catch (_) {
+    // échec de synchro réseau : la page a déjà le bon état, seule
+    // la persistance cross-appareil est affectée
+  }
   setTimeout(() => syncing(false), 500);
 }
 
@@ -380,6 +540,17 @@ function applyI18n() {
     const key = el.dataset.i18n;
     el.textContent = t(key);
   });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.setAttribute('title', t(el.dataset.i18nTitle));
+  });
+  document.querySelectorAll('input[data-group-toggle]').forEach(inp => {
+    inp.closest('.toggle')?.setAttribute('title', t('groupToggleAll'));
+  });
+  document.getElementById('btnCloseEditor')?.setAttribute('aria-label', t('closeEditor'));
+  document.getElementById('siteToggleWrap')?.setAttribute('title', t('siteToggleTitle'));
   document.querySelectorAll('.lang-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.lang === lang);
   });
@@ -400,14 +571,21 @@ function updateUI() {
     if (inp.dataset.key in cfg) inp.checked = !!cfg[inp.dataset.key];
   });
 
-  // Compteurs de groupes
+  // Compteurs de groupes + bascule groupée (checked = tout actif,
+  // indeterminate = partiellement actif)
   const countMap = { mouse:'cnt-mouse', keyboard:'cnt-keyboard', behavior:'cnt-behavior', advanced:'cnt-advanced' };
   Object.entries(FEATURE_GROUPS).forEach(([g, keys]) => {
     const el = document.getElementById(countMap[g]);
-    if (!el) return;
     const active = keys.filter(k => cfg[k]).length;
-    el.textContent = `${active}/${keys.length}`;
-    el.classList.toggle('all-on', active === keys.length);
+    if (el) {
+      el.textContent = `${active}/${keys.length}`;
+      el.classList.toggle('all-on', active === keys.length);
+    }
+    const grpToggle = document.querySelector(`input[data-group-toggle="${g}"]`);
+    if (grpToggle) {
+      grpToggle.checked = active === keys.length;
+      grpToggle.indeterminate = active > 0 && active < keys.length;
+    }
   });
 
   // Status badge
@@ -421,6 +599,10 @@ function updateUI() {
   const sc = cfg.customScripts?.length || 0;
   const sb = document.getElementById('scriptsBadge');
   if (sb) { sb.style.display = sc > 0 ? '' : 'none'; sb.textContent = sc; }
+
+  // Le scan manuel n'a d'effet que si le masquage auto des overlays est actif
+  const scanBtn = document.getElementById('btnScanOverlays');
+  if (scanBtn) scanBtn.style.display = cfg.overlays ? '' : 'none';
 
   renderScriptList();
 }
@@ -445,6 +627,21 @@ function initToggles() {
   document.querySelectorAll('input[data-key]').forEach(inp => {
     inp.addEventListener('change', () => {
       applySettings({ [inp.dataset.key]: inp.checked });
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// GROUP TOGGLES (bascule groupée — active/désactive toutes les
+// fonctionnalités d'une catégorie en un clic)
+// ════════════════════════════════════════════════════════════════
+function initGroupToggles() {
+  document.querySelectorAll('input[data-group-toggle]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const keys = FEATURE_GROUPS[inp.dataset.groupToggle] || [];
+      const patch = {};
+      keys.forEach(k => { patch[k] = inp.checked; });
+      applySettings(patch);
     });
   });
 }
@@ -541,6 +738,10 @@ function initOverlayPanel() {
     await send('restoreAllOverlays');
     toast(t('toastAllRestored'));
   });
+  document.getElementById('btnScanOverlays')?.addEventListener('click', async () => {
+    await send('removeOverlays');
+    toast(t('toastScanDone'), 'info');
+  });
 }
 
 function renderOverlayList(list) {
@@ -586,7 +787,7 @@ function renderOverlayList(list) {
     const desc = document.createElement('div');
     desc.className = 'overlay-desc';
     desc.title = ov.desc || '';
-    desc.textContent = ov.desc || '(inconnu)'; // textContent = safe
+    desc.textContent = ov.desc || t('unknownElement'); // textContent = safe
     const meta = document.createElement('div');
     meta.className = 'overlay-meta';
     meta.textContent = `${ov.auto ? t('overlayAuto') : t('overlayManual')} · ${t('ago', ago)}`;
@@ -595,7 +796,7 @@ function renderOverlayList(list) {
 
     const btn = document.createElement('button');
     btn.className = 'restore-btn';
-    btn.title = 'Restaurer';
+    btn.title = t('restoreOne');
     btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 15a9 9 0 1 0 .49-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     btn.addEventListener('click', async () => {
       await send('restoreOverlay', { id: ov.id });
@@ -639,7 +840,7 @@ function renderScriptList() {
     info.className = 'script-info';
     const name = document.createElement('div');
     name.className = 'script-name';
-    name.textContent = sc.name || 'Sans nom'; // textContent = safe
+    name.textContent = sc.name || t('unnamedScript'); // textContent = safe
     const meta = document.createElement('div');
     meta.className = 'script-meta';
     meta.textContent = `${sc.runAt || ''} · ${lines} ligne${lines > 1 ? 's' : ''}`;
@@ -704,10 +905,10 @@ function initScriptEditor() {
   document.getElementById('btnCloseEditor')?.addEventListener('click', closeScriptEditor);
 
   document.getElementById('btnSaveScript')?.addEventListener('click', () => {
-    const name  = (document.getElementById('editorName')?.value || '').trim() || 'Script';
+    const name  = (document.getElementById('editorName')?.value || '').trim() || t('defaultScriptName');
     const code  = document.getElementById('editorCode')?.value || '';
     const runAt = document.getElementById('editorRunAt')?.value || 'document_idle';
-    if (!code.trim()) { toast('Code vide', 'err'); return; }
+    if (!code.trim()) { toast(t('emptyCode'), 'err'); return; }
     let scripts = [...(cfg.customScripts || [])];
     if (editingScriptId) {
       scripts = scripts.map(s => s.id === editingScriptId ? { ...s, name, code, runAt } : s);
@@ -729,10 +930,10 @@ function initScriptEditor() {
   });
 
   // Snippets exemples
-  document.querySelectorAll('.tip-btn[data-snippet]').forEach(btn => {
+  document.querySelectorAll('.tip-btn[data-snippet-key]').forEach(btn => {
     btn.addEventListener('click', () => {
       const codeEl = document.getElementById('editorCode');
-      if (codeEl) { codeEl.value = btn.dataset.snippet; codeEl.focus(); }
+      if (codeEl) { codeEl.value = t(btn.dataset.snippetKey); codeEl.focus(); }
     });
   });
 }
@@ -793,18 +994,20 @@ function initSettings() {
       Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in snap) safe[k] = !!snap[k]; });
       applySettings(safe);
       toast(t('toastDefaultsLoaded'));
-    } catch (_) { toast('Erreur de lecture', 'err'); }
+    } catch (_) { toast(t('readError'), 'err'); }
   });
 
-  // Reset usine
+  // Reset usine — applique sur la page immédiatement, persiste ensuite
   document.getElementById('btnFactoryReset')?.addEventListener('click', async () => {
     const ok = await showConfirm('confirmFactoryTitle', 'confirmFactoryMsg');
     if (!ok) return;
-    await chrome.storage.sync.clear();
-    await chrome.storage.sync.set({ ...FACTORY_DEFAULTS, customScripts: '[]', language: lang, theme });
     cfg = { ...FACTORY_DEFAULTS, customScripts: [] };
     updateUI();
-    await send('updateSettings', { settings: cfg });
+    send('updateSettings', { settings: cfg });
+    try {
+      await chrome.storage.sync.clear();
+      await chrome.storage.sync.set({ ...FACTORY_DEFAULTS, customScripts: '[]', language: lang, theme });
+    } catch (_) {}
     toast(t('toastFactoryDone'));
   });
 
@@ -858,17 +1061,29 @@ async function loadSettings() {
     customScripts: '[]',
     language: 'fr',
     theme: 'dark',
+    excludedSites: [],
   });
   lang  = stored.language || 'fr';
   theme = stored.theme    || 'dark';
+  excludedSites = Array.isArray(stored.excludedSites) ? stored.excludedSites : [];
 
   let scripts = [];
   try { scripts = JSON.parse(stored.customScripts || '[]'); } catch (_) {}
-  cfg = { ...FACTORY_DEFAULTS, ...stored, customScripts: scripts };
+  // cfg ne doit contenir QUE les clés de FACTORY_DEFAULTS + customScripts.
+  // language/theme/excludedSites sont retirés explicitement du spread : sinon
+  // ils se propagent dans cfg → envoyés tels quels à content.js (qui les
+  // fusionne dans current) → ALLOWED_KEYS dépassé côté inject.js →
+  // validatePayload() rejette CHAQUE message 'update' (cf. bug déjà rencontré
+  // avec la fuite de 'language' côté content.js — celle-ci était son pendant
+  // côté popup, restée non détectée).
+  const { language: _l, theme: _t, excludedSites: _es, customScripts: _cs, ...toggles } = stored;
+  cfg = { ...FACTORY_DEFAULTS, ...toggles, customScripts: scripts };
 
   applyTheme(theme);
   applyI18n();
   updateUI();
+  updateSiteBar();
+  renderExcludedList();
 
   // Demander l'état courant (liste overlays, etc.)
   await send('getState');
@@ -880,9 +1095,12 @@ async function loadSettings() {
 document.addEventListener('DOMContentLoaded', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   tabId = tab?.id || null;
+  currentHostname = tab?.url ? getHostname(tab.url) : '';
 
   initTabs();
   initToggles();
+  initGroupToggles();
+  initSiteBar();
   initQuickActions();
   initTools();
   initOverlayPanel();
@@ -901,6 +1119,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         lang = newValue; applyI18n();
       } else if (k === 'theme') {
         applyTheme(newValue);
+      } else if (k === 'excludedSites') {
+        excludedSites = Array.isArray(newValue) ? newValue : [];
+        updateSiteBar();
+        renderExcludedList();
       } else if (k in FACTORY_DEFAULTS) {
         cfg[k] = newValue; needsUpdate = true;
       }
