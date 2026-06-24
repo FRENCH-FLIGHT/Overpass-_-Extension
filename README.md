@@ -71,6 +71,8 @@ The popup is organised into **4 tabs**:
 **Quick actions** in the toolbar:
 - **Enable All / Disable All** — one-click toggle of all protections
 - **Pick** — click any element on the page to hide it (Escape to cancel)
+- Each protection category also has its own group switch, to enable or disable a whole category (e.g. all mouse-related protections) in a single click
+- A banner under the header lets you disable Overpass entirely on the current site, with no need to touch individual toggles — manage your excluded sites anytime from the Settings tab
 
 ---
 
@@ -78,6 +80,7 @@ The popup is organised into **4 tabs**:
 - Browser internal pages (`chrome://`, `about:`) cannot be modified
 - Content gated server-side (never sent to your browser) cannot be recovered
 - DevTools bypass is marked experimental — some very advanced detection methods may still work
+- Excluding a site disables Overpass on that domain, but third-party content embedded from a *different* domain (e.g. some ads or widgets) is matched separately, since each is its own security context
 
 ---
 
@@ -90,7 +93,36 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.0.0 — Current
+### v3.1.0 — Current
+- **New** — Site exclusion: disable Overpass entirely on the current site with one switch in a new banner under the header, manage the full list anytime from the Settings tab
+- **Important fix** — settings changes made from the popup could still silently fail to apply without a page reload in some cases; this is now fully resolved
+- General cleanup and small reliability improvements
+
+### v3.0.4
+- Example script snippets now insert content in the selected interface language instead of always in French
+- Reduced unnecessary data written on every settings change, for better reliability on slow connections
+- A few more leftover French texts fixed across the interface
+- General cleanup and small reliability improvements
+
+### v3.0.3
+- Added a manual "Scan page" action in the Overlays tab, to re-check the page for blocking elements on demand
+- Fixed a few more interface texts (placeholders, button tooltips, example script labels) that weren't following the selected language
+- General cleanup and small reliability improvements
+
+### v3.0.2
+- Fixed several interface messages that stayed in French regardless of the selected language
+- Fixed a missing keyboard focus indicator on one of the settings controls
+- Minor performance optimization on pages with complex component structures
+- General cleanup and small reliability improvements
+
+### v3.0.1
+- Fixed an issue where toggling a protection on or off in the popup would not take effect on the current page until it was manually reloaded — changes now apply instantly
+- Fixed a display issue where enabling the cursor protection could make the mouse cursor disappear on text-heavy pages (e.g. search results), showing a text caret instead
+- Refreshed interface: lighter, faster-loading design with no external font dependency
+- Added quick group-level switches to enable or disable a whole category of protections at once
+- General bug fixes and stability improvements
+
+### v3.0.0
 - **Major release** — significant expansion of bypass coverage and reliability
 - New protections against advanced content-restriction techniques used by modern websites
 - Improved compatibility with sites using isolated component architectures (Web Components)
