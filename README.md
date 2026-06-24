@@ -66,7 +66,7 @@ The popup is organised into **4 tabs**:
 | **Protections** | Toggle each bypass on or off individually |
 | **Overlays** | View and restore elements hidden by the extension |
 | **Scripts** | Create, edit and manage custom JavaScript snippets |
-| **Settings** | Language, theme, save your own defaults, factory reset |
+| **Settings** | Language, theme, save your own defaults, export/import a full backup, factory reset |
 
 **Quick actions** in the toolbar:
 - **Enable All / Disable All** — one-click toggle of all protections
@@ -93,7 +93,11 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.1.0 — Current
+### v3.2.0 — Current
+- **New** — Export/Import: save a full backup of your settings (protections, custom scripts, excluded sites) to a file, and restore it anytime from the Settings tab
+- General cleanup and small reliability improvements
+
+### v3.1.0
 - **New** — Site exclusion: disable Overpass entirely on the current site with one switch in a new banner under the header, manage the full list anytime from the Settings tab
 - **Important fix** — settings changes made from the popup could still silently fail to apply without a page reload in some cases; this is now fully resolved
 - General cleanup and small reliability improvements
