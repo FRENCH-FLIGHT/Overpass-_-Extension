@@ -73,6 +73,7 @@ The popup is organised into **4 tabs**:
 - **Pick** — click any element on the page to hide it (Escape to cancel)
 - Each protection category also has its own group switch, to enable or disable a whole category (e.g. all mouse-related protections) in a single click
 - A banner under the header lets you disable Overpass entirely on the current site, with no need to touch individual toggles — manage your excluded sites anytime from the Settings tab
+- Global keyboard shortcuts (configurable at `chrome://extensions/shortcuts`) let you toggle everything, or just the current site, without opening the popup at all
 
 ---
 
@@ -93,7 +94,12 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.2.0 — Current
+### v3.3.0 — Current
+- **New** — Global keyboard shortcuts: toggle all protections, or toggle exclusion on the current site, without opening the popup. Customize them anytime at `chrome://extensions/shortcuts` (path is shown — and copyable — in the Settings → About section)
+- **Fix** — custom scripts set to run once the page is fully loaded could occasionally re-run when an unrelated setting was changed; they now only run once per page load as intended
+- General cleanup and small reliability improvements
+
+### v3.2.0
 - **New** — Export/Import: save a full backup of your settings (protections, custom scripts, excluded sites) to a file, and restore it anytime from the Settings tab
 - General cleanup and small reliability improvements
 
