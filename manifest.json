@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Overpass: Page Freedom",
   "short_name": "Overpass",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Take back control of any web page \u2014 right-click, text selection, clipboard, keyboard shortcuts, overlays, and more.",
   "permissions": [
     "storage",
@@ -47,6 +47,16 @@
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "commands": {
+    "toggle-all": {
+      "suggested_key": { "default": "Ctrl+Shift+U", "mac": "Command+Shift+U" },
+      "description": "Activer/désactiver toutes les protections"
+    },
+    "toggle-site-exclusion": {
+      "suggested_key": { "default": "Ctrl+Shift+Y", "mac": "Command+Shift+Y" },
+      "description": "Activer/désactiver Overpass sur ce site"
+    }
   },
   "web_accessible_resources": [
     {
