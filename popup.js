@@ -1,5 +1,5 @@
 /**
- * Overpass v3.2.0 – popup.js
+ * Overpass v3.3.0 – popup.js
  *
  * Sécurité :
  * - Aucun innerHTML avec données non échappées (XSS safe)
@@ -74,6 +74,8 @@ const I18N = {
     settingFactoryDesc:'Remet tout à zéro et supprime vos scripts personnalisés.',
     factoryReset:'Restaurer les paramètres usine',
     settingAbout:'À propos', aboutEngine:'Moteur', aboutCompat:'Compatibilité',
+    aboutShortcuts:'Raccourcis', aboutShortcutsTitle:'Cliquer pour copier — à coller dans la barre d\'adresse',
+    toastShortcutsCopied:'✓ Chemin copié, collez-le dans la barre d\'adresse',
     footerSync:'Synchronisé entre les onglets',
     toastEnabled:'✓ Tout activé !', toastDisabled:'Tout désactivé',
     toastDefaultsSaved:'✓ Défauts sauvegardés', toastDefaultsLoaded:'✓ Défauts chargés',
@@ -157,6 +159,8 @@ const I18N = {
     settingFactoryDesc:'Reset everything: removes custom scripts and restores original settings.',
     factoryReset:'Restore factory settings',
     settingAbout:'About', aboutEngine:'Engine', aboutCompat:'Compatibility',
+    aboutShortcuts:'Shortcuts', aboutShortcutsTitle:'Click to copy — paste it in the address bar',
+    toastShortcutsCopied:'✓ Path copied, paste it in the address bar',
     footerSync:'Synced across tabs',
     toastEnabled:'✓ All enabled!', toastDisabled:'All disabled',
     toastDefaultsSaved:'✓ Defaults saved', toastDefaultsLoaded:'✓ Defaults loaded',
@@ -240,6 +244,8 @@ const I18N = {
     settingFactoryDesc:'Reinicia todo: elimina scripts y restaura ajustes originales.',
     factoryReset:'Restaurar ajustes de fábrica',
     settingAbout:'Acerca de', aboutEngine:'Motor', aboutCompat:'Compatibilidad',
+    aboutShortcuts:'Atajos', aboutShortcutsTitle:'Clic para copiar — pégalo en la barra de direcciones',
+    toastShortcutsCopied:'✓ Ruta copiada, pégala en la barra de direcciones',
     footerSync:'Sincronizado entre pestañas',
     toastEnabled:'✓ ¡Todo activado!', toastDisabled:'Todo desactivado',
     toastDefaultsSaved:'✓ Valores guardados', toastDefaultsLoaded:'✓ Valores cargados',
@@ -323,6 +329,8 @@ const I18N = {
     settingFactoryDesc:'Alles zurücksetzen: löscht Skripte und stellt Originaleinstellungen wieder her.',
     factoryReset:'Werkseinstellungen',
     settingAbout:'Über', aboutEngine:'Engine', aboutCompat:'Kompatibilität',
+    aboutShortcuts:'Tastenkürzel', aboutShortcutsTitle:'Klicken zum Kopieren — in die Adressleiste einfügen',
+    toastShortcutsCopied:'✓ Pfad kopiert, in die Adressleiste einfügen',
     footerSync:'Tabs synchronisiert',
     toastEnabled:'✓ Alles aktiviert!', toastDisabled:'Alles deaktiviert',
     toastDefaultsSaved:'✓ Standards gespeichert', toastDefaultsLoaded:'✓ Standards geladen',
@@ -349,7 +357,7 @@ const I18N = {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const VERSION = '3.2.0';
+const VERSION = '3.3.0';
 
 const FEATURE_GROUPS = {
   mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
@@ -1145,6 +1153,15 @@ function initSettings() {
       await chrome.storage.sync.set({ ...FACTORY_DEFAULTS, customScripts: '[]', language: lang, theme });
     } catch (_) {}
     toast(t('toastFactoryDone'));
+  });
+
+  // Raccourcis clavier — copie le chemin plutôt que de tenter une navigation
+  // directe vers une page chrome:// (non garantie depuis une extension)
+  document.getElementById('shortcutsLink')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText('chrome://extensions/shortcuts');
+      toast(t('toastShortcutsCopied'));
+    } catch (_) {}
   });
 
   // Labels version
