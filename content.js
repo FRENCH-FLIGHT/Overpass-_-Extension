@@ -1,5 +1,5 @@
 /**
- * Overpass v3.2.0 – content.js  (ISOLATED world, run_at: document_start)
+ * Overpass v3.3.0 – content.js  (ISOLATED world, run_at: document_start)
  *
  * Rôle : pont sécurisé entre chrome.storage/runtime et inject.js (MAIN world).
  *
