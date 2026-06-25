@@ -1,5 +1,5 @@
 /**
- * Overpass v3.2.0 – inject.js  (world:"MAIN", run_at:"document_start")
+ * Overpass v3.3.0 – inject.js  (world:"MAIN", run_at:"document_start")
  *
  * COUCHES DE BYPASS :
  *  L1  Event.prototype override        ← le plus profond, touche tout
@@ -1570,8 +1570,15 @@
         if (action === 'update' && !validatePayload(payload)) return;
         const safe = {};
         Object.keys(payload || {}).forEach(k => { if (ALLOWED_KEYS.has(k)) safe[k] = payload[k]; });
+        // 'customScripts' est toujours présent dans le payload (même vide,
+        // donc toujours "truthy" en JS) : comparer son contenu réel plutôt
+        // que sa simple présence, sinon _ran est réinitialisé à chaque mise
+        // à jour — y compris pour un toggle sans rapport — et les scripts
+        // document_idle se ré-exécutent à chaque bascule de réglage.
+        const scriptsChanged = 'customScripts' in safe &&
+          JSON.stringify(safe.customScripts) !== JSON.stringify(S.customScripts);
         Object.assign(S, safe);
-        if (safe.customScripts) _ran.clear();
+        if (scriptsChanged) _ran.clear();
         applyAll('document_idle');
         break;
       }
@@ -1588,7 +1595,7 @@
   }, false);
 
   // ════════════════════════════════════════════════════════════════
-  // Bootstrap v3.2.0
+  // Bootstrap v3.3.0
   // ════════════════════════════════════════════════════════════════
 
   // Phase 1 — document_start (immédiat, avant tout)
