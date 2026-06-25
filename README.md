@@ -94,7 +94,7 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.3.0 — Current
+### v3.3.0 — Experimental
 - **New** — Global keyboard shortcuts: toggle all protections, or toggle exclusion on the current site, without opening the popup. Customize them anytime at `chrome://extensions/shortcuts` (path is shown — and copyable — in the Settings → About section)
 - **Fix** — custom scripts set to run once the page is fully loaded could occasionally re-run when an unrelated setting was changed; they now only run once per page load as intended
 - General cleanup and small reliability improvements
@@ -103,7 +103,7 @@ Users are responsible for complying with the terms of service of websites they v
 - **New** — Export/Import: save a full backup of your settings (protections, custom scripts, excluded sites) to a file, and restore it anytime from the Settings tab
 - General cleanup and small reliability improvements
 
-### v3.1.0
+### v3.1.0 - Stable
 - **New** — Site exclusion: disable Overpass entirely on the current site with one switch in a new banner under the header, manage the full list anytime from the Settings tab
 - **Important fix** — settings changes made from the popup could still silently fail to apply without a page reload in some cases; this is now fully resolved
 - General cleanup and small reliability improvements
