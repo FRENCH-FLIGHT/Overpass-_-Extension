@@ -27,7 +27,11 @@
 ### ⚙️ Advanced
 - **DevTools Protection** — prevents sites from detecting when you open developer tools
 - **Console Guard** — stops pages from clearing your console history
-- **Custom Scripts** — run your own JavaScript automatically on any page, at the timing you choose
+- **Custom Scripts** — run your own JavaScript automatically on any page, at the timing you choose, optionally restricted to a specific site or domain
+
+### 🛟 Support
+- **Update Check** — get notified right in the popup when a new version is available, with a direct link to it
+- **Issue Reporting** — spotted a bypass that isn't working? Report it in one click, prefilled with the relevant context, directly on the project's GitHub page
 
 
 ---
@@ -63,16 +67,17 @@ The popup is organised into **4 tabs**:
 
 | Tab | What it does |
 |-----|-------------|
-| **Protections** | Toggle each bypass on or off individually |
+| **Protections** | Toggle each bypass on or off individually — quick presets at the top let you switch between common configurations instantly |
 | **Overlays** | View and restore elements hidden by the extension |
 | **Scripts** | Create, edit and manage custom JavaScript snippets |
-| **Settings** | Language, theme, save your own defaults, export/import a full backup, factory reset |
+| **Settings** | Language, theme, save your own defaults, export/import a full backup, check for updates, report an issue, factory reset |
 
 **Quick actions** in the toolbar:
 - **Enable All / Disable All** — one-click toggle of all protections
 - **Pick** — click any element on the page to hide it (Escape to cancel)
 - Each protection category also has its own group switch, to enable or disable a whole category (e.g. all mouse-related protections) in a single click
 - A banner under the header lets you disable Overpass entirely on the current site, with no need to touch individual toggles — manage your excluded sites anytime from the Settings tab
+- The same banner lets you save the current settings as a profile for that site alone, distinct from your global settings
 - Global keyboard shortcuts (configurable at `chrome://extensions/shortcuts`) let you toggle everything, or just the current site, without opening the popup at all
 
 ---
@@ -94,7 +99,24 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.3.0 — Experimental
+### v3.5.0 — Current
+- **New** — Update check: the popup now tells you when a new version is available, with a direct link to it — a small indicator also appears next to the version number in the header
+- **New** — Issue reporting: report a problem in one click from the Settings tab, or directly from a specific site's banner for context-aware reports — opens a prefilled ticket on the project's GitHub page, no data sent automatically
+- General cleanup and small reliability improvements
+
+### v3.4.1 — Current
+- Bug fixes: the "Balanced" quick preset now correctly applies its settings
+- Performance: reduced unnecessary background activity when changing settings
+- General cleanup and small reliability improvements
+
+### v3.4.0
+- **New** — Custom scripts can now be restricted to a specific site or domain (e.g. `example.com` or `*.example.com`), instead of always running on every page — existing scripts are unaffected and keep running everywhere as before
+- **New** — Site profiles: save a distinct combination of protections for a specific site, different from your global settings, using the icon in the banner at the top of the popup — manage saved profiles anytime from the Settings tab
+- **New** — Quick presets at the top of the Protections tab: switch instantly between "Reading" (optimized for articles and paywalls), "Stealth" (minimal footprint), or "Balanced" (recommended defaults)
+- **New** — The toolbar icon badge now reflects the actual state of the current tab: greyed out when the site is excluded, purple when a site profile is active, green count otherwise
+- General cleanup and small reliability improvements
+
+### v3.3.0
 - **New** — Global keyboard shortcuts: toggle all protections, or toggle exclusion on the current site, without opening the popup. Customize them anytime at `chrome://extensions/shortcuts` (path is shown — and copyable — in the Settings → About section)
 - **Fix** — custom scripts set to run once the page is fully loaded could occasionally re-run when an unrelated setting was changed; they now only run once per page load as intended
 - General cleanup and small reliability improvements
@@ -103,7 +125,7 @@ Users are responsible for complying with the terms of service of websites they v
 - **New** — Export/Import: save a full backup of your settings (protections, custom scripts, excluded sites) to a file, and restore it anytime from the Settings tab
 - General cleanup and small reliability improvements
 
-### v3.1.0 - Stable
+### v3.1.0
 - **New** — Site exclusion: disable Overpass entirely on the current site with one switch in a new banner under the header, manage the full list anytime from the Settings tab
 - **Important fix** — settings changes made from the popup could still silently fail to apply without a page reload in some cases; this is now fully resolved
 - General cleanup and small reliability improvements
