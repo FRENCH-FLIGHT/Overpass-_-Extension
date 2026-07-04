@@ -1,5 +1,5 @@
 /**
- * Overpass v3.3.0 – background.js (Service Worker)
+ * Overpass v3.5.0 – background.js (Service Worker)
  *
  * Responsabilités :
  *   1. Génère et rotation du token d'authentification postMessage
@@ -13,6 +13,58 @@ const FACTORY_DEFAULTS = {
   print: true,        overlays: false,    devtools: false,  consoleProtect: false,
   focus: false,       visibility: true,
 };
+
+// ── Dépôt GitHub — source des releases et des signalements ────────
+const REPO_SLUG = 'FRENCH-FLIGHT/Overpass-_-Extension';
+const REPO_URL  = `https://github.com/${REPO_SLUG}`;
+
+// ── Vérification de mise à jour ────────────────────────────────────
+// Lecture seule (api.github.com), throttlée pour rester très en-deçà des
+// limites de l'API publique GitHub. Résultat stocké en storage.local (donné
+// propre à cet appareil, pas synchronisé entre profils).
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
+
+function compareVersions(a, b) {
+  const pa = String(a || '0').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b || '0').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const da = pa[i] || 0, db = pb[i] || 0;
+    if (da !== db) return da > db ? 1 : -1;
+  }
+  return 0;
+}
+
+async function checkForUpdate(force = false) {
+  const current = chrome.runtime.getManifest().version;
+  try {
+    if (!force) {
+      const { updateInfo } = await chrome.storage.local.get({ updateInfo: null });
+      if (updateInfo?.checkedAt && Date.now() - updateInfo.checkedAt < UPDATE_CHECK_INTERVAL_MS) {
+        return updateInfo;
+      }
+    }
+    const res = await fetch(`https://api.github.com/repos/${REPO_SLUG}/releases/latest`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const data = await res.json();
+    const latestVersion = String(data.tag_name || '').replace(/^v/i, '');
+    const info = {
+      latestVersion: latestVersion || null,
+      url: data.html_url || `${REPO_URL}/releases/latest`,
+      hasUpdate: latestVersion ? compareVersions(latestVersion, current) > 0 : false,
+      checkedAt: Date.now(),
+      ok: true,
+    };
+    await chrome.storage.local.set({ updateInfo: info });
+    return info;
+  } catch (_) {
+    // Pas de réseau, API indisponible, ou taux limité — échec silencieux,
+    // on retente au prochain cycle. On renvoie le dernier résultat connu s'il existe.
+    const { updateInfo } = await chrome.storage.local.get({ updateInfo: null });
+    return updateInfo || { ok: false, checkedAt: Date.now() };
+  }
+}
 
 // ── Token de session ─────────────────────────────────────────────
 function generateToken() {
@@ -31,13 +83,18 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
       theme: 'dark',
       userDefaults: null,
       excludedSites: [],
+      siteProfiles: {},
     });
   }
+  updateAllBadges();
+  checkForUpdate(false);
 });
 
 // Regénère le token à chaque démarrage du navigateur
 chrome.runtime.onStartup.addListener(async () => {
   await chrome.storage.local.set({ __op_token: generateToken() });
+  updateAllBadges();
+  checkForUpdate(false);
 });
 
 // ── Messages ─────────────────────────────────────────────────────
@@ -48,26 +105,82 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
       reply({ defaults: FACTORY_DEFAULTS });
       return true;
 
+    case 'checkUpdate':
+      checkForUpdate(true).then(reply);
+      return true;
+
+    case 'getUpdateInfo':
+      chrome.storage.local.get({ updateInfo: null }).then(({ updateInfo }) => reply(updateInfo));
+      return true;
+
     default:
       return false;
   }
 });
 
 // ── Badge ────────────────────────────────────────────────────────
+// Le badge reflète désormais l'état RÉEL de chaque onglet, pas seulement
+// les réglages globaux : site exclu (gris, tiret), profil de site actif
+// (violet, compte du profil), ou réglages globaux (vert si actif).
+const BADGE_COLOR_ACTIVE   = '#22c55e';
+const BADGE_COLOR_PROFILE  = '#a78bfa';
+const BADGE_COLOR_NEUTRAL  = '#64748b';
+
+function hostnameOf(url) {
+  try { return new URL(url).hostname || ''; } catch (_) { return ''; }
+}
+
 async function updateBadge(tabId) {
+  if (!tabId) return;
   try {
-    const s = await chrome.storage.sync.get(FACTORY_DEFAULTS);
-    const active = Object.keys(FACTORY_DEFAULTS).filter(k => s[k]).length;
+    const tab  = await chrome.tabs.get(tabId);
+    const host = tab?.url ? hostnameOf(tab.url) : '';
+    const stored = await chrome.storage.sync.get({
+      ...FACTORY_DEFAULTS,
+      excludedSites: [],
+      siteProfiles: {},
+    });
+
+    const excludedSites = Array.isArray(stored.excludedSites) ? stored.excludedSites : [];
+    if (host && excludedSites.includes(host)) {
+      await chrome.action.setBadgeText({ text: '–', tabId });
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR_NEUTRAL, tabId });
+      return;
+    }
+
+    const siteProfiles = (stored.siteProfiles && typeof stored.siteProfiles === 'object') ? stored.siteProfiles : {};
+    const profile = host ? siteProfiles[host] : null;
+    const effective = (profile && typeof profile === 'object') ? { ...stored, ...profile } : stored;
+    const active = Object.keys(FACTORY_DEFAULTS).filter(k => effective[k]).length;
+
     await chrome.action.setBadgeText({ text: active > 0 ? String(active) : '', tabId });
-    await chrome.action.setBadgeBackgroundColor({ color: active > 0 ? '#22c55e' : '#64748b', tabId });
+    await chrome.action.setBadgeBackgroundColor({
+      color: profile ? BADGE_COLOR_PROFILE : (active > 0 ? BADGE_COLOR_ACTIVE : BADGE_COLOR_NEUTRAL),
+      tabId,
+    });
+  } catch (_) {
+    // Onglet introuvable (fermé entre-temps) ou page sans accès — rien à faire
+  }
+}
+
+async function updateAllBadges() {
+  try {
+    const tabs = await chrome.tabs.query({});
+    tabs.forEach(t => updateBadge(t.id));
   } catch (_) {}
 }
 
 chrome.tabs.onActivated.addListener(({ tabId }) => updateBadge(tabId));
-chrome.storage.onChanged.addListener(async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab) updateBadge(tab.id);
+// La navigation change le hostname de l'onglet (donc son éventuelle
+// exclusion/profil) sans forcément déclencher de changement de storage —
+// on réévalue le badge à chaque fin de chargement de page.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'complete' || changeInfo.url) updateBadge(tabId);
 });
+// Le badge dépendant désormais de données par-onglet (exclusion, profil),
+// un changement de réglages peut affecter plusieurs onglets à la fois —
+// on réévalue donc tous les onglets plutôt que le seul onglet actif.
+chrome.storage.onChanged.addListener(() => updateAllBadges());
 
 // ── Raccourcis clavier (chrome.commands) ──────────────────────────
 // Les combinaisons par défaut sont des suggestions : si elles entrent en
