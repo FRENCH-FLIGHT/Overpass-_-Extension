@@ -1,4 +1,4 @@
-/* ══ Overpass v3.3.0 – popup.css ═══════════════════════════════ */
+/* ══ Overpass v3.5.0 – popup.css ═══════════════════════════════ */
 
 /* ── Dark theme ──────────────────────────────────────────────── */
 .dark {
@@ -82,7 +82,12 @@ body {
   display:flex; align-items:center; justify-content:center; color:var(--green);
 }
 .logo-name { font-size:15px; font-weight:700; letter-spacing:-.3px; color:var(--text); }
-.logo-sub  { font-size:9px; color:var(--dim); font-family:var(--font-mono); margin-top:1px; }
+.logo-sub  { font-size:9px; color:var(--dim); font-family:var(--font-mono); margin-top:1px; display:flex; align-items:center; gap:5px; }
+.update-dot {
+  width:6px; height:6px; border-radius:50%; background:var(--green);
+  box-shadow:0 0 5px var(--green); cursor:pointer; flex-shrink:0;
+  animation:pulse 2s infinite;
+}
 .header-right { display:flex; align-items:center; gap:7px; }
 
 .icon-btn-sm {
@@ -159,6 +164,15 @@ body {
 .panel.active { display:flex; }
 .panel::-webkit-scrollbar { width:3px; }
 .panel::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* ── Quick presets ───────────────────────────────────────────── */
+.presets-row {
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  padding:0 1px 9px;
+}
+.presets-label { font-size:10.5px; color:var(--dim); font-weight:500; white-space:nowrap; }
+.preset-btn { font-size:11px; padding:4px 10px; }
+.preset-btn.active { background:var(--green-glow); border-color:#22c55e38; color:var(--green); }
 
 /* ── Groups ──────────────────────────────────────────────────── */
 .group {
@@ -237,6 +251,8 @@ body {
 .site-bar.excluded { background:rgba(245,158,11,.07); }
 .site-bar.excluded .site-icon { color:var(--amber); }
 .site-bar.excluded .site-domain { color:var(--amber); }
+.site-save-btn { width:24px; height:24px; flex-shrink:0; }
+.site-save-btn.has-profile { color:var(--green); border-color:#22c55e48; background:var(--green-glow); }
 
 /* ── Excluded sites list (Settings) ─────────────────────────────── */
 .excluded-list { display:flex; flex-direction:column; gap:5px; margin-bottom:4px; }
@@ -330,6 +346,8 @@ body {
   transition:border-color .13s;
 }
 .editor-select:focus { border-color:var(--green); }
+.editor-match { width:100%; }
+.editor-match::placeholder { color:var(--dim); }
 .editor-code {
   background:var(--code-bg); border:1px solid var(--border2); border-radius:var(--rs);
   color:var(--code-col); font-family:var(--font-mono); font-size:11.5px;
@@ -385,6 +403,16 @@ body {
 .about-key  { color:var(--dim); }
 .about-val  { color:var(--text); }
 .mono { font-family:var(--font-mono); font-size:10.5px; }
+
+/* ── Support section — mise à jour + signalement ────────────────── */
+.update-row {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-bottom:9px;
+}
+.update-status { font-size:11.5px; color:var(--muted); }
+.update-status.has-update { color:var(--green); font-weight:600; }
+.update-status.checking   { color:var(--dim); }
+.update-status.err        { color:#f87171; }
 
 /* ── Pill buttons ────────────────────────────────────────────── */
 .pill-btn {
