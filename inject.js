@@ -1,5 +1,5 @@
 /**
- * Overpass v3.3.0 – inject.js  (world:"MAIN", run_at:"document_start")
+ * Overpass v3.5.0 – inject.js  (world:"MAIN", run_at:"document_start")
  *
  * COUCHES DE BYPASS :
  *  L1  Event.prototype override        ← le plus profond, touche tout
@@ -81,17 +81,8 @@
                     ? DataTransfer.prototype.setData : null,
   };
 
-  // Rend une fonction patchée indiscernable du natif.
-  //
-  // Approche WeakMap (v2.2.8) : au lieu d'ajouter une propriété `toString`
-  // en propre sur chaque fn (détectable via fn.hasOwnProperty('toString')),
-  // on intercepte Function.prototype.toString une seule fois et on stocke
-  // les noms dans un WeakMap invisible.
-  //
-  // Résultat :
-  //   fn.hasOwnProperty('toString')           → false  (identique au natif)
-  //   Object.getOwnPropertyDescriptor(fn,'toString') → undefined  ✓
-  //   fn.toString()                           → "function name() { [native code] }"  ✓
+  // Rend une fonction patchée indiscernable du natif via WeakMap :
+  // fn.hasOwnProperty('toString') → false, fn.toString() → "[native code]"
   const _nativeNames  = new WeakMap();
   const _origFnToStr  = Function.prototype.toString;
   try {
@@ -358,10 +349,8 @@
 
   // ════════════════════════════════════════════════════════════════
   // L4 — Capture-phase sentinels (enregistrement différé)
-  // passive:true obligatoire — voir explication v2.2.4.
-  // Les sentinels sont pré-créés ici mais enregistrés / retirés
-  // dynamiquement selon anyActive() pour laisser zéro trace quand
-  // l'extension est entièrement désactivée.
+  // Sentinels passive:true (évite le jank scroll), créés en mémoire,
+  // enregistrés/retirés dynamiquement selon anyActive() — zéro trace si inactif.
   // ════════════════════════════════════════════════════════════════
   const _sentinelFns = new Map(); // type → fn (pré-créées, pas encore enregistrées)
   let   _sentinelsOn = false;
@@ -762,7 +751,7 @@
       if (!_consolePatched) return;
       _consolePatched = false;
       console.clear = N.CC;
-      // Restaurer console.log (bug: n'était jamais restauré avant v2.2.7)
+      // Restaurer console.log
       if (_origConsoleLog) {
         try { console.log = nativeToStr(_origConsoleLog, 'log'); } catch (_) {}
         _origConsoleLog = null;
@@ -1001,10 +990,29 @@
   // Custom scripts (L9)
   // ════════════════════════════════════════════════════════════════
   const _ran = new Set();
+  // matchesSite — vérifie si le script doit s'exécuter sur la page courante.
+  // Volontairement simple (pas de regex) : un pattern absent ou vide signifie
+  // "partout" (comportement historique, rétrocompatible avec les scripts déjà
+  // enregistrés). "*.exemple.com" couvre le domaine et tous ses sous-domaines.
+  // Toute entrée malformée échoue simplement à matcher (fail-closed) plutôt
+  // que de faire tourner le script là où l'utilisateur ne l'attendait pas.
+  function matchesSite(pattern) {
+    if (!pattern || typeof pattern !== 'string') return true;
+    const p = pattern.trim().toLowerCase();
+    if (!p) return true;
+    const host = location.hostname.toLowerCase();
+    if (p.startsWith('*.')) {
+      const base = p.slice(2);
+      return !!base && (host === base || host.endsWith('.' + base));
+    }
+    return host === p;
+  }
+
   function runScripts(phase) {
     if (!Array.isArray(S.customScripts)) return;
     S.customScripts.forEach(sc => {
       if (!sc.enabled || sc.runAt !== phase) return;
+      if (!matchesSite(sc.match)) return;
       const uid = `${sc.id}_${phase}`;
       if (_ran.has(uid)) return;
       _ran.add(uid);
@@ -1595,7 +1603,7 @@
   }, false);
 
   // ════════════════════════════════════════════════════════════════
-  // Bootstrap v3.3.0
+  // Bootstrap
   // ════════════════════════════════════════════════════════════════
 
   // Phase 1 — document_start (immédiat, avant tout)
