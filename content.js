@@ -1,5 +1,5 @@
 /**
- * Overpass v3.3.0 – content.js  (ISOLATED world, run_at: document_start)
+ * Overpass v3.5.0 – content.js  (ISOLATED world, run_at: document_start)
  *
  * Rôle : pont sécurisé entre chrome.storage/runtime et inject.js (MAIN world).
  *
@@ -7,10 +7,6 @@
  *   Le token est lu depuis chrome.storage.local — inaccessible aux scripts
  *   de la page — et inclus dans chaque message envoyé à inject.js.
  *   Inject.js le valide et rejette tout message sans token valide.
- *
- * Note : les panels Cookie et Resource ont été retirés de l'extension (v2.2.0).
- * Le proxy cookies (background.js) et les handlers XHR/fetch (inject.js)
- * ont également été supprimés.
  */
 (function () {
   'use strict';
@@ -26,9 +22,18 @@
   };
 
   let token   = null;
-  let current = { ...DEFAULTS, customScripts: [], lang: 'fr', excluded: false };
+  let current = { ...DEFAULTS, customScripts: [], lang: 'fr', excluded: false, siteOverride: null };
   let ready   = false;
   let pending = null;
+
+  // Ne garde que les clés DEFAULTS d'un profil de site lu depuis le storage.
+  function sanitizeProfile(p) {
+    if (!p || typeof p !== 'object') return null;
+    const safe = {};
+    let any = false;
+    Object.keys(DEFAULTS).forEach(k => { if (k in p) { safe[k] = !!p[k]; any = true; } });
+    return any ? safe : null;
+  }
 
   // ── Envoi sécurisé vers inject.js ──────────────────────────────
   function toInject(action, payload = {}) {
@@ -40,18 +45,22 @@
   // Si ce site (location.hostname) figure dans excludedSites, on envoie un
   // état "tout désactivé" plutôt que les réglages réels : inject.js retombe
   // alors naturellement sur teardown() (zéro trace), sans qu'aucune logique
-  // d'exclusion n'ait besoin d'exister côté inject.js.
+  // d'exclusion n'ait besoin d'exister côté inject.js. L'exclusion prime
+  // toujours sur un éventuel profil de site (priorité claire, sans ambiguïté).
+  // Sinon, si un profil existe pour ce site, ses clés écrasent les valeurs
+  // globales correspondantes — sans jamais ajouter de clé supplémentaire au
+  // payload (siteOverride ne contient que des clés déjà présentes dans rest).
   function effectivePayload() {
-    if (!current.excluded) {
-      // 'excluded' est un drapeau interne à content.js — il ne fait pas partie
-      // de ALLOWED_KEYS côté inject.js et doit être retiré avant l'envoi, sinon
-      // validatePayload() rejette le message (cf. bug des clés en surnombre).
-      const { excluded, ...rest } = current;
-      return rest;
+    if (current.excluded) {
+      const off = {};
+      Object.keys(DEFAULTS).forEach(k => { off[k] = false; });
+      return { ...off, customScripts: [], lang: current.lang };
     }
-    const off = {};
-    Object.keys(DEFAULTS).forEach(k => { off[k] = false; });
-    return { ...off, customScripts: [], lang: current.lang };
+    // 'excluded' et 'siteOverride' sont des drapeaux internes à content.js —
+    // ils ne font pas partie de ALLOWED_KEYS côté inject.js et doivent être
+    // retirés avant l'envoi, sinon validatePayload() rejette le message.
+    const { excluded, siteOverride, ...rest } = current;
+    return siteOverride ? { ...rest, ...siteOverride } : rest;
   }
 
   function pushToInject(action) {
@@ -83,20 +92,22 @@
 
   // ── Chargement des settings depuis storage ──────────────────────
   function loadAndApply() {
-    chrome.storage.sync.get({ ...DEFAULTS, customScripts: '[]', language: 'fr', excludedSites: [] }, raw => {
-      let scripts = [];
-      try { scripts = JSON.parse(raw.customScripts ?? '[]'); } catch (_) {}
-      // On exclut 'language' (et le customScripts brut, déjà parsé ci-dessus)
-      // du spread de raw : sinon cette clé s'ajoute en surnombre dans current,
-      // ce qui fait dépasser ALLOWED_KEYS côté inject.js et fait échouer
-      // validatePayload() sur CHAQUE message 'update' — les cases cochées
-      // n'avaient alors d'effet qu'après un rechargement complet de la page
-      // (le message 'init', lui, n'est pas filtré par validatePayload).
-      const { language, customScripts: _rawScripts, excludedSites, ...toggles } = raw;
-      const excluded = Array.isArray(excludedSites) && excludedSites.includes(location.hostname);
-      current = { ...DEFAULTS, ...toggles, customScripts: scripts, lang: language || 'fr', excluded };
-      pushToInject('init');
-    });
+    chrome.storage.sync.get(
+      { ...DEFAULTS, customScripts: '[]', language: 'fr', excludedSites: [], siteProfiles: {} },
+      raw => {
+        let scripts = [];
+        try { scripts = JSON.parse(raw.customScripts ?? '[]'); } catch (_) {}
+        // Retirer les clés non-toggle pour rester dans ALLOWED_KEYS côté inject.js.
+        const { language, customScripts: _rawScripts, excludedSites, siteProfiles, ...toggles } = raw;
+        const excluded = Array.isArray(excludedSites) && excludedSites.includes(location.hostname);
+        const rawProfile = (siteProfiles && typeof siteProfiles === 'object') ? siteProfiles[location.hostname] : null;
+        current = {
+          ...DEFAULTS, ...toggles, customScripts: scripts, lang: language || 'fr',
+          excluded, siteOverride: sanitizeProfile(rawProfile),
+        };
+        pushToInject('init');
+      }
+    );
   }
 
   // ── Messages du popup → forward vers inject.js ──────────────────
@@ -107,7 +118,9 @@
         const scripts = msg.settings.customScripts ?? current.customScripts;
         current = { ...current, ...msg.settings, customScripts: scripts };
         if (msg.settings.language !== undefined) current.lang = msg.settings.language;
-        chrome.storage.sync.set({ ...msg.settings, customScripts: JSON.stringify(scripts) });
+        // Pas d'écriture storage ici : tous les appelants de 'updateSettings'
+        // (popup.js, background.js) persistent déjà eux-mêmes. content.js
+        // n'a qu'à appliquer en direct sur la page.
         pushToInject('update');
         reply({ ok: true });
         break;
@@ -149,6 +162,20 @@
     const wasExcluded = current.excluded;
     current.excluded = list.includes(location.hostname);
     if (current.excluded !== wasExcluded) pushToInject('update');
+  });
+
+  // ── Synchronisation profil de site ───────────────────────────────
+  // Même principe que l'exclusion : le popup écrit directement siteProfiles
+  // dans chrome.storage.sync, chaque frame réévalue ici si SON PROPRE
+  // hostname est concerné.
+  chrome.storage.onChanged.addListener(changes => {
+    if (!changes.siteProfiles) return;
+    const profiles = changes.siteProfiles.newValue;
+    const rawProfile = (profiles && typeof profiles === 'object') ? profiles[location.hostname] : null;
+    const next = sanitizeProfile(rawProfile);
+    const changed = JSON.stringify(next) !== JSON.stringify(current.siteOverride);
+    current.siteOverride = next;
+    if (changed) pushToInject('update');
   });
 
   // ── Initialisation ──────────────────────────────────────────────
