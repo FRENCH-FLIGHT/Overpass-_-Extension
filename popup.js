@@ -1,5 +1,5 @@
 /**
- * Overpass v3.5.0 – popup.js
+ * Overpass v3.6.0 – popup.js
  *
  * Sécurité :
  * - Aucun innerHTML avec données non échappées (XSS safe)
@@ -88,17 +88,14 @@ const I18N = {
     importSummary: (sc, si, sp) => `Cette sauvegarde contient ${sc} script${sc>1?'s':''} personnalisé${sc>1?'s':''}, ${si} site${si>1?'s':''} exclu${si>1?'s':''} et ${sp} profil${sp>1?'s':''} de site. Vos réglages actuels seront remplacés. Continuer ?`,
     settingSupport:'Support',
     updateUpToDate:'À jour', updateChecking:'Vérification…', updateCheckFailed:'Échec de la vérification',
+    updateNoReleases:'Aucune version publiée pour l\u2019instant',
     updateAvailable: v => `Version ${v} disponible`,
-    checkUpdate:'Vérifier',
+    checkUpdate:'Vérifier', goToRelease:'Mettre à jour',
     toastUpdateAvailable: v => `✓ Version ${v} disponible !`, toastUpdateNone:'Vous êtes déjà à jour',
     updateDotTitle:'Mise à jour disponible — cliquer pour en savoir plus',
     settingReportDesc:"Un bypass ne fonctionne pas comme prévu ? Signalez-le pour nous aider à l'améliorer.",
     reportIssue:'Signaler un problème',
     reportSiteTitle:'Signaler un problème sur ce site',
-    reportGeneralTitle:'[Bug] ',
-    reportSiteIssueTitle: host => `[Bug] Bypass inefficace sur ${host}`,
-    reportDescLabel:'Décrivez le problème',
-    reportNoneActive:'aucune',
     settingFactory:'Réinitialisation',
     settingFactoryDesc:'Remet tout à zéro et supprime vos scripts personnalisés.',
     factoryReset:'Restaurer les paramètres usine',
@@ -202,17 +199,14 @@ const I18N = {
     importSummary: (sc, si, sp) => `This backup contains ${sc} custom script${sc>1?'s':''}, ${si} excluded site${si>1?'s':''} and ${sp} site profile${sp>1?'s':''}. Your current settings will be replaced. Continue?`,
     settingSupport:'Support',
     updateUpToDate:'Up to date', updateChecking:'Checking…', updateCheckFailed:'Check failed',
+    updateNoReleases:'No version published yet',
     updateAvailable: v => `Version ${v} available`,
-    checkUpdate:'Check',
+    checkUpdate:'Check', goToRelease:'Update',
     toastUpdateAvailable: v => `✓ Version ${v} available!`, toastUpdateNone:"You're already up to date",
     updateDotTitle:'Update available — click to learn more',
     settingReportDesc:"A bypass isn't working as expected? Report it to help us improve.",
     reportIssue:'Report an issue',
     reportSiteTitle:'Report an issue on this site',
-    reportGeneralTitle:'[Bug] ',
-    reportSiteIssueTitle: host => `[Bug] Bypass not working on ${host}`,
-    reportDescLabel:'Describe the issue',
-    reportNoneActive:'none',
     settingFactory:'Reset',
     settingFactoryDesc:'Reset everything: removes custom scripts and restores original settings.',
     factoryReset:'Restore factory settings',
@@ -316,17 +310,14 @@ const I18N = {
     importSummary: (sc, si, sp) => `Esta copia contiene ${sc} script${sc>1?'s':''} personalizado${sc>1?'s':''}, ${si} sitio${si>1?'s':''} excluido${si>1?'s':''} y ${sp} perfil${sp>1?'es':''} de sitio. Tus ajustes actuales serán reemplazados. ¿Continuar?`,
     settingSupport:'Soporte',
     updateUpToDate:'Actualizado', updateChecking:'Comprobando…', updateCheckFailed:'Fallo al comprobar',
+    updateNoReleases:'Aún no hay versiones publicadas',
     updateAvailable: v => `Versión ${v} disponible`,
-    checkUpdate:'Comprobar',
+    checkUpdate:'Comprobar', goToRelease:'Actualizar',
     toastUpdateAvailable: v => `✓ ¡Versión ${v} disponible!`, toastUpdateNone:'Ya tienes la última versión',
     updateDotTitle:'Actualización disponible — clic para saber más',
     settingReportDesc:'¿Un bypass no funciona como debería? Repórtalo para ayudarnos a mejorar.',
     reportIssue:'Reportar un problema',
     reportSiteTitle:'Reportar un problema en este sitio',
-    reportGeneralTitle:'[Bug] ',
-    reportSiteIssueTitle: host => `[Bug] Bypass no funciona en ${host}`,
-    reportDescLabel:'Describe el problema',
-    reportNoneActive:'ninguna',
     settingFactory:'Restablecimiento',
     settingFactoryDesc:'Reinicia todo: elimina scripts y restaura ajustes originales.',
     factoryReset:'Restaurar ajustes de fábrica',
@@ -430,17 +421,14 @@ const I18N = {
     importSummary: (sc, si, sp) => `Diese Sicherung enthält ${sc} benutzerdefiniertes Skript${sc>1?'e':''}, ${si} ausgeschlossene Seite${si>1?'n':''} und ${sp} Seitenprofil${sp>1?'e':''}. Deine aktuellen Einstellungen werden ersetzt. Fortfahren?`,
     settingSupport:'Support',
     updateUpToDate:'Aktuell', updateChecking:'Wird geprüft…', updateCheckFailed:'Prüfung fehlgeschlagen',
+    updateNoReleases:'Noch keine Version veröffentlicht',
     updateAvailable: v => `Version ${v} verfügbar`,
-    checkUpdate:'Prüfen',
+    checkUpdate:'Prüfen', goToRelease:'Aktualisieren',
     toastUpdateAvailable: v => `✓ Version ${v} verfügbar!`, toastUpdateNone:'Du bist bereits auf dem neuesten Stand',
     updateDotTitle:'Update verfügbar — klicken für mehr Infos',
     settingReportDesc:'Funktioniert ein Bypass nicht wie erwartet? Melde es, damit wir die Erweiterung verbessern können.',
     reportIssue:'Problem melden',
     reportSiteTitle:'Problem auf dieser Seite melden',
-    reportGeneralTitle:'[Bug] ',
-    reportSiteIssueTitle: host => `[Bug] Bypass funktioniert nicht auf ${host}`,
-    reportDescLabel:'Beschreibe das Problem',
-    reportNoneActive:'keine',
     settingFactory:'Zurücksetzen',
     settingFactoryDesc:'Alles zurücksetzen: löscht Skripte und stellt Originaleinstellungen wieder her.',
     factoryReset:'Werkseinstellungen',
@@ -473,8 +461,7 @@ const I18N = {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const VERSION = '3.5.0';
-const REPO_SLUG = 'FRENCH-FLIGHT/Overpass-_-Extension';
+const VERSION = '3.6.0';
 
 const FEATURE_GROUPS = {
   mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
@@ -552,22 +539,6 @@ function getHostname(url) {
 
 // ════════════════════════════════════════════════════════════════
 // SITE BAR — exclusion d'Overpass sur le site de l'onglet actif
-// ════════════════════════════════════════════════════════════════
-// Calcule l'état des protections RÉELLEMENT appliqué sur currentHostname —
-// même sémantique que effectivePayload() côté content.js (exclusion > profil
-// > réglage global). Utilisé par le signalement contextuel pour que le
-// rapport reflète ce qui est vraiment actif sur ce site, pas juste cfg.
-function getEffectiveSiteConfig() {
-  if (!currentHostname) return { ...cfg };
-  if (excludedSites.includes(currentHostname)) {
-    const off = {};
-    Object.keys(FACTORY_DEFAULTS).forEach(k => { off[k] = false; });
-    return off;
-  }
-  const profile = siteProfiles[currentHostname];
-  return profile ? { ...cfg, ...profile } : { ...cfg };
-}
-
 function updateSiteBar() {
   const bar = document.getElementById('siteBar');
   const inp = document.getElementById('siteActiveToggle');
@@ -1385,13 +1356,19 @@ async function handleImportFile(file) {
 function renderUpdateStatus() {
   const el = document.getElementById('updateStatus');
   const dot = document.getElementById('updateDot');
+  const btn = document.getElementById('btnCheckUpdate');
   const hasUpdate = !!(updateInfo && updateInfo.hasUpdate && updateInfo.latestVersion);
   if (dot) dot.style.display = hasUpdate ? '' : 'none';
+  if (btn) setText(btn, hasUpdate ? t('goToRelease') : t('checkUpdate'));
   if (!el) return;
   el.classList.remove('has-update', 'checking', 'err');
   if (!updateInfo || updateInfo.ok === false) {
     el.textContent = t('updateCheckFailed');
     el.classList.add('err');
+  } else if (updateInfo.noReleases) {
+    // 404 côté GitHub : le dépôt n'a simplement aucune Release publiée pour
+    // l'instant — ce n'est pas un échec du mécanisme, donc pas de style err.
+    el.textContent = t('updateNoReleases');
   } else if (hasUpdate) {
     el.textContent = t('updateAvailable', updateInfo.latestVersion);
     el.classList.add('has-update');
@@ -1416,64 +1393,35 @@ async function checkUpdateNow() {
   renderUpdateStatus();
   if (updateInfo?.hasUpdate) toast(t('toastUpdateAvailable', updateInfo.latestVersion));
   else if (updateInfo?.ok === false) toast(t('updateCheckFailed'), 'err');
+  else if (updateInfo?.noReleases) toast(t('updateNoReleases'), 'info');
   else toast(t('toastUpdateNone'), 'info');
 }
 
-// ════════════════════════════════════════════════════════════════
-// REPORTING — ouvre un ticket GitHub pré-rempli, aucune donnée envoyée
-// sans action explicite de l'utilisateur (chrome.tabs.create = navigation
-// normale, pas de requête réseau initiée par l'extension elle-même).
-// ════════════════════════════════════════════════════════════════
-function browserLabel() {
-  const ua = navigator.userAgent || '';
-  if (/Edg\//.test(ua))    return 'Edge';
-  if (/OPR\//.test(ua))    return 'Opera';
-  if (/Brave/.test(ua))    return 'Brave';
-  if (/Chrome\//.test(ua)) return 'Chrome';
-  return 'Unknown';
+// Le bouton change de rôle selon l'état : "Vérifier" relance une vérification,
+// "Mettre à jour" (quand une nouvelle version existe) amène directement sur
+// sa page de release GitHub — l'auto-installation n'étant pas possible pour
+// une extension distribuée hors Web Store, c'est la voie la plus directe.
+function handleUpdateButtonClick() {
+  if (updateInfo?.hasUpdate && updateInfo.url) {
+    chrome.tabs.create({ url: updateInfo.url });
+  } else {
+    checkUpdateNow();
+  }
 }
 
-function openGithubIssue(title, bodyLines) {
-  const params = new URLSearchParams({
-    title,
-    body: bodyLines.join('\n'),
-    labels: 'bug',
-  });
-  chrome.tabs.create({ url: `https://github.com/${REPO_SLUG}/issues/new?${params.toString()}` });
-}
-
+// ════════════════════════════════════════════════════════════════
+// REPORTING — ouvre la page de signalement dédiée (report.html) en onglet
+// complet. Toute la construction du rapport (contexte, aperçu, envoi vers
+// GitHub) y est gérée de façon autonome ; popup.js ne fait que naviguer.
+// ════════════════════════════════════════════════════════════════
 function reportGeneral() {
-  openGithubIssue(t('reportGeneralTitle'), [
-    '**' + t('reportDescLabel') + ':** ',
-    '',
-    '---',
-    `Overpass: v${VERSION}`,
-    `Browser: ${browserLabel()}`,
-    `Language: ${lang}`,
-  ]);
+  chrome.tabs.create({ url: chrome.runtime.getURL('report.html') });
 }
 
 function reportSite() {
   if (!currentHostname) { reportGeneral(); return; }
-  const effective = getEffectiveSiteConfig();
-  const activeList = Object.keys(FACTORY_DEFAULTS)
-    .filter(k => effective[k])
-    .join(', ') || t('reportNoneActive');
-  const excluded = excludedSites.includes(currentHostname);
-  const hasProfile = !!siteProfiles[currentHostname];
-
-  openGithubIssue(t('reportSiteIssueTitle', currentHostname), [
-    '**' + t('reportDescLabel') + ':** ',
-    '',
-    '---',
-    `Site: ${currentHostname}`,
-    `Overpass: v${VERSION}`,
-    `Browser: ${browserLabel()}`,
-    `Language: ${lang}`,
-    `Excluded: ${excluded}`,
-    `Site profile: ${hasProfile}`,
-    `Active protections: ${activeList}`,
-  ]);
+  const url = chrome.runtime.getURL('report.html') + '?' + new URLSearchParams({ site: currentHostname });
+  chrome.tabs.create({ url });
 }
 
 function initSettings() {
@@ -1553,9 +1501,12 @@ function initSettings() {
   });
 
   // Mise à jour et signalement
-  document.getElementById('btnCheckUpdate')?.addEventListener('click', checkUpdateNow);
+  document.getElementById('btnCheckUpdate')?.addEventListener('click', handleUpdateButtonClick);
   document.getElementById('btnReportIssue')?.addEventListener('click', reportGeneral);
-  document.getElementById('updateDot')?.addEventListener('click', () => switchToTab('settings'));
+  document.getElementById('updateDot')?.addEventListener('click', () => {
+    if (updateInfo?.url) chrome.tabs.create({ url: updateInfo.url });
+    else switchToTab('settings');
+  });
 
   // Labels version
   const vl = document.getElementById('versionText');
