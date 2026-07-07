@@ -99,12 +99,24 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.5.0 — Current
+### v3.6.0 — Current
+- **New** — The report page now lets you pick which site the issue is about from a dropdown of your open tabs, instead of relying only on automatic detection
+- **Improved** — Reports now include much more complete environment details automatically (exact browser version, operating system, and the full status of every protection) — you only need to fill in the title and description
+- **Improved** — Update checks are now clearer about the difference between "no new version yet" and an actual connection problem
+- General cleanup and small reliability improvements
+
+### v3.5.5
+- **Improved** — Issue reporting now opens a dedicated, full-page report form instead of going straight to GitHub: it shows the auto-detected context clearly (with a timestamp), lets you add your own description, and gives you a live preview before you send anything — nothing leaves your browser until you click "Open on GitHub" or "Copy report" yourself
+- **Improved** — Your report is now saved automatically as you type, so accidentally closing the tab won't make you lose your work
+- **Improved** — When an update is available, the button in Settings now takes you directly to that release's page on GitHub instead of just re-checking
+- General cleanup and small reliability improvements
+
+### v3.5.0
 - **New** — Update check: the popup now tells you when a new version is available, with a direct link to it — a small indicator also appears next to the version number in the header
 - **New** — Issue reporting: report a problem in one click from the Settings tab, or directly from a specific site's banner for context-aware reports — opens a prefilled ticket on the project's GitHub page, no data sent automatically
 - General cleanup and small reliability improvements
 
-### v3.4.1 — Current
+### v3.4.1
 - Bug fixes: the "Balanced" quick preset now correctly applies its settings
 - Performance: reduced unnecessary background activity when changing settings
 - General cleanup and small reliability improvements
