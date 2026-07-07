@@ -1,5 +1,5 @@
 /**
- * Overpass v3.5.0 – background.js (Service Worker)
+ * Overpass v3.6.0 – background.js (Service Worker)
  *
  * Responsabilités :
  *   1. Génère et rotation du token d'authentification postMessage
@@ -46,6 +46,17 @@ async function checkForUpdate(force = false) {
     const res = await fetch(`https://api.github.com/repos/${REPO_SLUG}/releases/latest`, {
       headers: { Accept: 'application/vnd.github+json' },
     });
+    // 404 signifie qu'aucune Release n'a encore été publiée sur le dépôt
+    // (différent d'un tag ou d'un commit) — état normal et attendu tant que
+    // le projet n'a pas de release, pas un échec de la vérification elle-même.
+    if (res.status === 404) {
+      const info = {
+        latestVersion: null, url: `${REPO_URL}/releases`, hasUpdate: false,
+        noReleases: true, checkedAt: Date.now(), ok: true,
+      };
+      await chrome.storage.local.set({ updateInfo: info });
+      return info;
+    }
     if (!res.ok) throw new Error('http ' + res.status);
     const data = await res.json();
     const latestVersion = String(data.tag_name || '').replace(/^v/i, '');
@@ -53,14 +64,16 @@ async function checkForUpdate(force = false) {
       latestVersion: latestVersion || null,
       url: data.html_url || `${REPO_URL}/releases/latest`,
       hasUpdate: latestVersion ? compareVersions(latestVersion, current) > 0 : false,
+      noReleases: false,
       checkedAt: Date.now(),
       ok: true,
     };
     await chrome.storage.local.set({ updateInfo: info });
     return info;
   } catch (_) {
-    // Pas de réseau, API indisponible, ou taux limité — échec silencieux,
-    // on retente au prochain cycle. On renvoie le dernier résultat connu s'il existe.
+    // Pas de réseau, API indisponible, ou taux limité — échec réel, on
+    // renvoie le dernier résultat connu s'il existe plutôt que de perdre
+    // l'information précédente.
     const { updateInfo } = await chrome.storage.local.get({ updateInfo: null });
     return updateInfo || { ok: false, checkedAt: Date.now() };
   }
