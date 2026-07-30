@@ -1,5 +1,5 @@
 /**
- * Overpass v3.6.0 – popup.js
+ * Overpass v3.6.4 – popup.js
  *
  * Sécurité :
  * - Aucun innerHTML avec données non échappées (XSS safe)
@@ -88,6 +88,7 @@ const I18N = {
     importSummary: (sc, si, sp) => `Cette sauvegarde contient ${sc} script${sc>1?'s':''} personnalisé${sc>1?'s':''}, ${si} site${si>1?'s':''} exclu${si>1?'s':''} et ${sp} profil${sp>1?'s':''} de site. Vos réglages actuels seront remplacés. Continuer ?`,
     settingSupport:'Support',
     updateUpToDate:'À jour', updateChecking:'Vérification…', updateCheckFailed:'Échec de la vérification',
+    toastStorageQuotaExceeded:'⚠ Trop volumineux pour être sauvegardé — réduisez la taille de vos scripts',
     updateNoReleases:'Aucune version publiée pour l\u2019instant',
     updateAvailable: v => `Version ${v} disponible`,
     checkUpdate:'Vérifier', goToRelease:'Mettre à jour',
@@ -199,6 +200,7 @@ const I18N = {
     importSummary: (sc, si, sp) => `This backup contains ${sc} custom script${sc>1?'s':''}, ${si} excluded site${si>1?'s':''} and ${sp} site profile${sp>1?'s':''}. Your current settings will be replaced. Continue?`,
     settingSupport:'Support',
     updateUpToDate:'Up to date', updateChecking:'Checking…', updateCheckFailed:'Check failed',
+    toastStorageQuotaExceeded:'⚠ Too large to save — try reducing the size of your scripts',
     updateNoReleases:'No version published yet',
     updateAvailable: v => `Version ${v} available`,
     checkUpdate:'Check', goToRelease:'Update',
@@ -310,6 +312,7 @@ const I18N = {
     importSummary: (sc, si, sp) => `Esta copia contiene ${sc} script${sc>1?'s':''} personalizado${sc>1?'s':''}, ${si} sitio${si>1?'s':''} excluido${si>1?'s':''} y ${sp} perfil${sp>1?'es':''} de sitio. Tus ajustes actuales serán reemplazados. ¿Continuar?`,
     settingSupport:'Soporte',
     updateUpToDate:'Actualizado', updateChecking:'Comprobando…', updateCheckFailed:'Fallo al comprobar',
+    toastStorageQuotaExceeded:'⚠ Demasiado grande para guardar — reduce el tamaño de tus scripts',
     updateNoReleases:'Aún no hay versiones publicadas',
     updateAvailable: v => `Versión ${v} disponible`,
     checkUpdate:'Comprobar', goToRelease:'Actualizar',
@@ -421,6 +424,7 @@ const I18N = {
     importSummary: (sc, si, sp) => `Diese Sicherung enthält ${sc} benutzerdefiniertes Skript${sc>1?'e':''}, ${si} ausgeschlossene Seite${si>1?'n':''} und ${sp} Seitenprofil${sp>1?'e':''}. Deine aktuellen Einstellungen werden ersetzt. Fortfahren?`,
     settingSupport:'Support',
     updateUpToDate:'Aktuell', updateChecking:'Wird geprüft…', updateCheckFailed:'Prüfung fehlgeschlagen',
+    toastStorageQuotaExceeded:'⚠ Zu groß zum Speichern — verkleinere deine Skripte',
     updateNoReleases:'Noch keine Version veröffentlicht',
     updateAvailable: v => `Version ${v} verfügbar`,
     checkUpdate:'Prüfen', goToRelease:'Aktualisieren',
@@ -461,7 +465,7 @@ const I18N = {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const VERSION = '3.6.0';
+const VERSION = '3.6.4';
 
 const FEATURE_GROUPS = {
   mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
@@ -746,9 +750,17 @@ async function applySettings(patch) {
     const toStore = { ...safe };
     if ('customScripts' in toStore) toStore.customScripts = JSON.stringify(toStore.customScripts);
     await chrome.storage.sync.set(toStore);
-  } catch (_) {
-    // échec de synchro réseau : la page a déjà le bon état, seule
-    // la persistance cross-appareil est affectée
+  } catch (err) {
+    // Un dépassement de quota (chrome.storage.sync limite chaque élément à
+    // 8 Ko — facilement atteint avec plusieurs scripts personnalisés,
+    // notamment après un import) doit être signalé : sans ça, l'utilisateur
+    // croit que son changement est enregistré alors qu'il ne survivra pas
+    // au redémarrage du navigateur. Les autres échecs (réseau, etc.) restent
+    // silencieux — la page a déjà le bon état, seule la persistance cross-
+    // appareil est affectée, et retenter à chaque toggle serait trop bruyant.
+    if (/quota/i.test(err?.message || '')) {
+      toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+    }
   }
   setTimeout(() => syncing(false), 500);
 }
@@ -1328,7 +1340,8 @@ async function handleImportFile(file) {
   if (!ok) return;
 
   // Toggles + scripts : passe par applySettings (application live immédiate,
-  // puis persistance — même chemin que tous les autres réglages).
+  // puis persistance — même chemin que tous les autres réglages, avec la
+  // même détection de quota).
   await applySettings({ ...parsed.settings, customScripts: parsed.customScripts });
 
   // excludedSites / siteProfiles / language / theme : remplacement complet
@@ -1339,7 +1352,10 @@ async function handleImportFile(file) {
   const toStore = { excludedSites, siteProfiles };
   if (parsed.language) { lang = parsed.language; toStore.language = lang; }
   if (parsed.theme)    { theme = parsed.theme;   toStore.theme    = theme; }
-  try { await chrome.storage.sync.set(toStore); } catch (_) {}
+  let quotaExceeded = false;
+  try { await chrome.storage.sync.set(toStore); } catch (err) {
+    if (/quota/i.test(err?.message || '')) quotaExceeded = true;
+  }
 
   if (parsed.language) applyI18n();
   if (parsed.theme)    applyTheme(theme);
@@ -1347,7 +1363,11 @@ async function handleImportFile(file) {
   renderExcludedList();
   renderProfilesList();
 
-  toast(t('toastImportDone'));
+  // Le toast final doit rester honnête : si l'écriture des sites exclus/
+  // profils a échoué pour cause de quota, l'utilisateur doit le savoir
+  // plutôt que de croire l'import entièrement persisté.
+  if (quotaExceeded) toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+  else toast(t('toastImportDone'));
 }
 
 // ════════════════════════════════════════════════════════════════
