@@ -99,7 +99,25 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.6.0 — Current
+### v3.6.4 — Current
+- **Fixed** — You're now warned if a change (like importing a backup with large custom scripts) is too big to be saved, instead of silently failing to persist
+- General cleanup and small reliability improvements
+
+### v3.6.3
+- **Improved** — Smoother performance on single-page apps that navigate frequently, avoiding redundant work right after a page change
+- General cleanup and small reliability improvements
+
+### v3.6.2
+- **Fixed** — Reduced memory usage during long browsing sessions, especially on single-page apps that add and remove a lot of content over time
+- General cleanup and small reliability improvements
+
+### v3.6.1
+- **Improved** — Better coverage for scroll unlocking: keyboard scrolling (spacebar, arrow keys, page up/down) is now restored too, not just mouse wheel and touch
+- **Improved** — Printing restoration is now more reliable against pages that specifically try to hide content when printing
+- **Improved** — Auto-hiding of cookie banners and paywall overlays now catches more cases, including shorter banners anchored to the edge of the screen and elements built with modern web components
+- General cleanup and small reliability improvements
+
+### v3.6.0
 - **New** — The report page now lets you pick which site the issue is about from a dropdown of your open tabs, instead of relying only on automatic detection
 - **Improved** — Reports now include much more complete environment details automatically (exact browser version, operating system, and the full status of every protection) — you only need to fill in the title and description
 - **Improved** — Update checks are now clearer about the difference between "no new version yet" and an actual connection problem
