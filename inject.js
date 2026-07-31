@@ -660,16 +660,46 @@
   //  V6  Error.stack : masque les chemins d'extension
   //  V7  Proxy console.id : neutralise le getter DevTools
   // ════════════════════════════════════════════════════════════════
-  let _devDone = false;
+  let _devDone  = false;
+  let _devOrigs = null;
+
+  // Restaure les vecteurs V1–V7 à leur état natif. Nécessaire pour que
+  // désactiver cette protection (ou un teardown complet) efface réellement
+  // ses traces, au lieu de laisser Function/eval/alert/Proxy/etc. patchés
+  // indéfiniment sur la page une fois activés ne serait-ce qu'une fois.
+  function _restoreDevtools() {
+    if (!_devDone) return;
+    _devDone = false;
+    const o = _devOrigs;
+    _devOrigs = null;
+    if (!o) return;
+    try { window.Function = o.Function; } catch (_) {}
+    try { window.eval = o.eval; } catch (_) {}
+    try { delete window.outerWidth; } catch (_) {}
+    try { delete window.outerHeight; } catch (_) {}
+    try { window.alert = o.alert; } catch (_) {}
+    try { performance.now = o.now; } catch (_) {}
+    try { window.setInterval = o.setInterval; } catch (_) {}
+    try { window.setTimeout = o.setTimeout; } catch (_) {}
+    try { Error.prepareStackTrace = o.prepareStackTrace; } catch (_) {}
+    try { window.Proxy = o.Proxy; } catch (_) {}
+  }
+
   function patchDevtools() {
-    if (!S.devtools || _devDone) return;
+    if (!S.devtools) { _restoreDevtools(); return; }
+    if (_devDone) return;
     _devDone = true;
+    _devOrigs = {
+      Function: window.Function, eval: window.eval, alert: window.alert,
+      now: performance.now, setInterval: window.setInterval, setTimeout: window.setTimeout,
+      prepareStackTrace: Error.prepareStackTrace, Proxy: window.Proxy,
+    };
 
     // V1 — Neutralise debugger via Function() / eval()
     // NOTE: "function eval" et "function Function" sont interdits en strict
     // mode → on utilise des variables intermédiaires sans ces noms réservés.
     try {
-      const _Fn = window.Function;
+      const _Fn = _devOrigs.Function;
       const sanitize = s => typeof s === 'string' ? s.replace(/\bdebugger\b/g, '(void 0)') : s;
       const _FnWrap = nativeToStr(function (...args) {
         return _Fn.apply(this, args.map(sanitize));
@@ -677,7 +707,7 @@
       _FnWrap.prototype = _Fn.prototype;
       window.Function = _FnWrap;
 
-      const _ev = window.eval;
+      const _ev = _devOrigs.eval;
       const _evalWrap = function (code) {
         return _ev.call(this, typeof code === 'string' ? sanitize(code) : code);
       };
@@ -693,7 +723,7 @@
 
     // V3 — Bloquer les alertes de détection
     try {
-      const _al = window.alert;
+      const _al = _devOrigs.alert;
       window.alert = nativeToStr(function alert(msg) {
         if (typeof msg === 'string' && /devtools|inspect|console/i.test(msg)) return;
         return _al.call(this, msg);
@@ -725,7 +755,7 @@
 
     // V6 — Error.stack : masquer les chemins chrome-extension://
     try {
-      const _ES = Error.prepareStackTrace;
+      const _ES = _devOrigs.prepareStackTrace;
       Error.prepareStackTrace = function (err, stack) {
         const clean = stack.filter(f => !(f.getFileName?.() || '').includes('chrome-extension://'));
         if (_ES) return _ES(err, clean);
@@ -735,15 +765,15 @@
 
     // V7 — Proxy : neutralise la détection via console.id getter
     try {
-      const _P = window.Proxy;
+      const _P = _devOrigs.Proxy;
       window.Proxy = new _P(_P, {
         construct(target, args) {
           const [obj, handler] = args;
           if (handler && typeof handler.get === 'function') {
             const orig = handler.get.bind(handler);
-            handler.get = function (o, prop, recv) {
-              if (prop === 'id' && o === console) return 1;
-              return orig(o, prop, recv);
+            handler.get = function (o2, prop, recv) {
+              if (prop === 'id' && o2 === console) return 1;
+              return orig(o2, prop, recv);
             };
           }
           return new target(obj, handler);
@@ -869,6 +899,7 @@
   const _ovEls   = new WeakMap(); // el → overlayId — remplace el.dataset.uaOvId
   let _ovCnt = 0;
   let _ovlDebTimer = null;
+  let _overlaySweepInterval = null; // resweep périodique (voir _manageOverlaySweep)
 
   // Debounce _sendOverlayList : évite N postMessages si N overlays sont cachés
   // d'un coup (ex: autoRemoveOverlays sur une page avec plusieurs éléments).
@@ -980,6 +1011,24 @@
       ['modal-open','overflow-hidden','no-scroll','noscroll','scroll-lock','locked']
         .forEach(c => document.body?.classList.remove(c));
     } catch (_) {}
+  }
+
+  // Resweep périodique — certains overlays sont déjà présents dans le DOM au
+  // chargement mais restent masqués (display:none, classe "hidden"…) jusqu'à
+  // ce que le site les révèle après un délai (ex: bandeau d'abonnement qui
+  // apparaît après quelques secondes de lecture). Ça ne déclenche aucune
+  // mutation childList, donc _needOvl n'est jamais levé pour ce cas. On ne
+  // surveille pas class/style dans le MutationObserver (attributeFilter plus
+  // haut) car ce serait trop coûteux sur les SPA — un balayage léger toutes
+  // les 4s, toujours en idle callback, couvre ce cas à un coût négligeable.
+  function _manageOverlaySweep() {
+    if (S.overlays) {
+      if (_overlaySweepInterval) return;
+      _overlaySweepInterval = N.sI(() => _idle(autoRemoveOverlays), 4000);
+    } else if (_overlaySweepInterval) {
+      clearInterval(_overlaySweepInterval);
+      _overlaySweepInterval = null;
+    }
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -1439,8 +1488,11 @@
   // ─────────────────────────────────────────────────────────────────────────
   function _shadowCSS() {
     const p = [];
-    if (S.selectstart)   p.push('*{user-select:auto!important;-webkit-user-select:auto!important}');
-    if (S.cursor)        p.push('*{cursor:auto!important;-webkit-touch-callout:default!important}');
+    // Mêmes valeurs que buildCSS() pour le document principal : "auto"
+    // réintroduit le curseur texte au survol de texte brut (déjà corrigé en
+    // v3.0.1) et peut rester hérité d'un user-select:none du composant hôte.
+    if (S.selectstart)   p.push('*{user-select:text!important;-webkit-user-select:text!important;-moz-user-select:text!important}');
+    if (S.cursor)        p.push('*{cursor:default!important;-webkit-touch-callout:default!important}');
     if (S.pointerEvents) p.push('*{pointer-events:auto!important}');
     return p.join('');
   }
@@ -1591,6 +1643,8 @@
       _shadowRoots.clear();
       _shadowPatched = false;
     }
+    _restoreDevtools();
+    if (_overlaySweepInterval) { clearInterval(_overlaySweepInterval); _overlaySweepInterval = null; }
     _insertRuleActive  = false;
     _setPropActive     = false;
     _adoptedActive     = false;
@@ -1625,8 +1679,9 @@
     patchGetSelection();
     patchClipboardContent();
     patchShadowDOM();
-    if (S.devtools)  patchDevtools();
+    patchDevtools();
     if (S.overlays)  _idle(autoRemoveOverlays);
+    _manageOverlaySweep();
     if (phase)       runScripts(phase);
   }
 
