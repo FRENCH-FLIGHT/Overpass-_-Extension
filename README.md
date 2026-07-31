@@ -101,6 +101,8 @@ Users are responsible for complying with the terms of service of websites they v
 
 ### v3.6.4 — Current
 - **Fixed** — You're now warned if a change (like importing a backup with large custom scripts) is too big to be saved, instead of silently failing to persist
+- **Fixed** — Turning off DevTools Protection now fully reverts it, instead of leaving some of it active until the page is reloaded
+- **Improved** — Auto-hiding of popups now also catches ones that appear a few seconds after the page loads, not just ones present immediately
 - General cleanup and small reliability improvements
 
 ### v3.6.3
