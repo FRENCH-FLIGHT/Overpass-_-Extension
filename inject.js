@@ -1,5 +1,5 @@
 /**
- * Overpass v3.4.1 – inject.js  (world:"MAIN", run_at:"document_start")
+ * Overpass v3.7.0 – inject.js  (world:"MAIN", run_at:"document_start")
  *
  * COUCHES DE BYPASS :
  *  L1  Event.prototype override        ← le plus profond, touche tout
@@ -198,15 +198,29 @@
     onbeforeprint    : 'print',
     onbeforeunload   : 'keyboard',
     onblur        : 'focus',
+    onwheel       : 'scroll',
+    ontouchmove   : 'scroll',
   };
 
   // Set de tags interactifs partagé par blocked() et clearInlineHandlers
   const _INTERACTIVE_TAGS = new Set(['INPUT','TEXTAREA','SELECT','BUTTON','OPTION','OPTGROUP']);
 
+  // Touches utilisées par les sites pour bloquer le scroll clavier (Espace,
+  // flèches, PageUp/Down, Home/End) quand un modal/paywall est ouvert.
+  // ev.code (pas ev.key) : indépendant de la disposition clavier.
+  const SCROLL_KEY_CODES = new Set([
+    'Space', 'PageUp', 'PageDown', 'End', 'Home',
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  ]);
+
   function blocked(ev) {
     const k = EV[ev.type];
-    if (!k || !S[k]) return false;
-    if (k === 'keyboard') {
+    // Une touche de défilement doit être défaite dès que S.scroll est actif,
+    // même si S.keyboard (raccourcis génériques) est désactivé — ce sont deux
+    // préoccupations distinctes pour l'utilisateur.
+    const isScrollKey = ev.type === 'keydown' && SCROLL_KEY_CODES.has(ev.code);
+    if (!((isScrollKey && S.scroll) || (k && S[k]))) return false;
+    if (k === 'keyboard' || isScrollKey) {
       if (!ev.ctrlKey && !ev.metaKey && !ev.altKey) {
         const tgt = ev.target;
         if (tgt && tgt !== document && tgt !== document.documentElement && tgt !== document.body) {
@@ -416,10 +430,13 @@
     if (S.scroll) {
       r.push(
         `html,body{overflow:auto!important;height:auto!important;touch-action:auto!important;max-height:none!important}`,
-        // Classes courantes de scroll-lock + attribut touch-action direct
+        // Classes courantes de scroll-lock + attribut touch-action direct.
+        // position/top couvrent le pattern body{position:fixed;top:-Npx}
+        // utilisé par de nombreuses librairies de modales pour bloquer le
+        // scroll tout en conservant visuellement la position de la page.
         `[class*="modal-open"],[class*="no-scroll"],[class*="noscroll"],[class*="scroll-lock"],` +
         `[class*="touch-none"],[class*="no-touch"],[touch-action="none"]` +
-        `{overflow:auto!important;touch-action:auto!important}`
+        `{overflow:auto!important;touch-action:auto!important;position:static!important;top:auto!important}`
       );
     }
     if (S.dragdrop) {
@@ -431,7 +448,14 @@
     }
     if (S.print) {
       r.push(
-        `@media print{html,body,*{display:revert!important;visibility:visible!important;overflow:visible!important;height:auto!important}}`
+        // :not(#__op_x__) répété booste la spécificité (chaque :not() hérite
+        // de la spécificité de son argument — ici un ID inexistant, donc sans
+        // effet sur la sélection réelle) sans quoi cette règle, avec un
+        // sélecteur universel, perdrait face à quasi toute règle du site
+        // utilisant une classe/ID, même toutes deux en !important.
+        `@media print{` +
+        `html:not(#__op_a__) body:not(#__op_b__) *:not(#__op_c__)` +
+        `{display:revert!important;visibility:visible!important;overflow:visible!important;height:auto!important}}`
       );
     }
     if (S.pointerEvents) {
@@ -636,16 +660,46 @@
   //  V6  Error.stack : masque les chemins d'extension
   //  V7  Proxy console.id : neutralise le getter DevTools
   // ════════════════════════════════════════════════════════════════
-  let _devDone = false;
+  let _devDone  = false;
+  let _devOrigs = null;
+
+  // Restaure les vecteurs V1–V7 à leur état natif. Nécessaire pour que
+  // désactiver cette protection (ou un teardown complet) efface réellement
+  // ses traces, au lieu de laisser Function/eval/alert/Proxy/etc. patchés
+  // indéfiniment sur la page une fois activés ne serait-ce qu'une fois.
+  function _restoreDevtools() {
+    if (!_devDone) return;
+    _devDone = false;
+    const o = _devOrigs;
+    _devOrigs = null;
+    if (!o) return;
+    try { window.Function = o.Function; } catch (_) {}
+    try { window.eval = o.eval; } catch (_) {}
+    try { delete window.outerWidth; } catch (_) {}
+    try { delete window.outerHeight; } catch (_) {}
+    try { window.alert = o.alert; } catch (_) {}
+    try { performance.now = o.now; } catch (_) {}
+    try { window.setInterval = o.setInterval; } catch (_) {}
+    try { window.setTimeout = o.setTimeout; } catch (_) {}
+    try { Error.prepareStackTrace = o.prepareStackTrace; } catch (_) {}
+    try { window.Proxy = o.Proxy; } catch (_) {}
+  }
+
   function patchDevtools() {
-    if (!S.devtools || _devDone) return;
+    if (!S.devtools) { _restoreDevtools(); return; }
+    if (_devDone) return;
     _devDone = true;
+    _devOrigs = {
+      Function: window.Function, eval: window.eval, alert: window.alert,
+      now: performance.now, setInterval: window.setInterval, setTimeout: window.setTimeout,
+      prepareStackTrace: Error.prepareStackTrace, Proxy: window.Proxy,
+    };
 
     // V1 — Neutralise debugger via Function() / eval()
     // NOTE: "function eval" et "function Function" sont interdits en strict
     // mode → on utilise des variables intermédiaires sans ces noms réservés.
     try {
-      const _Fn = window.Function;
+      const _Fn = _devOrigs.Function;
       const sanitize = s => typeof s === 'string' ? s.replace(/\bdebugger\b/g, '(void 0)') : s;
       const _FnWrap = nativeToStr(function (...args) {
         return _Fn.apply(this, args.map(sanitize));
@@ -653,7 +707,7 @@
       _FnWrap.prototype = _Fn.prototype;
       window.Function = _FnWrap;
 
-      const _ev = window.eval;
+      const _ev = _devOrigs.eval;
       const _evalWrap = function (code) {
         return _ev.call(this, typeof code === 'string' ? sanitize(code) : code);
       };
@@ -669,7 +723,7 @@
 
     // V3 — Bloquer les alertes de détection
     try {
-      const _al = window.alert;
+      const _al = _devOrigs.alert;
       window.alert = nativeToStr(function alert(msg) {
         if (typeof msg === 'string' && /devtools|inspect|console/i.test(msg)) return;
         return _al.call(this, msg);
@@ -677,10 +731,20 @@
     } catch (_) {}
 
     // V4 — performance.now() jitter anti-timing
+    // Le décalage doit rester monotone : "floor" d'une fonction croissante
+    // reste croissant, donc on ne peut jamais renvoyer une valeur inférieure
+    // à l'appel précédent (contrairement à un offset recalculé à chaque
+    // appel, qui pouvait faire "reculer" le temps et casser des libs
+    // d'animation/vidéo qui supposent performance.now() strictement
+    // croissante). L'offset aléatoire est fixé une fois par chargement de
+    // page — assez pour perturber un fingerprint de timing, sans jamais
+    // désynchroniser deux appels consécutifs.
     try {
       const _pn = N.perfNow;
+      const _bucket = 0.05;
+      const _offset = Math.random() * _bucket;
       performance.now = nativeToStr(function now() {
-        return _pn() - ((_pn() * 0.001) % 0.05);
+        return Math.floor((_pn() + _offset) / _bucket) * _bucket;
       }, 'now');
     } catch (_) {}
 
@@ -701,7 +765,7 @@
 
     // V6 — Error.stack : masquer les chemins chrome-extension://
     try {
-      const _ES = Error.prepareStackTrace;
+      const _ES = _devOrigs.prepareStackTrace;
       Error.prepareStackTrace = function (err, stack) {
         const clean = stack.filter(f => !(f.getFileName?.() || '').includes('chrome-extension://'));
         if (_ES) return _ES(err, clean);
@@ -710,17 +774,29 @@
     } catch (_) {}
 
     // V7 — Proxy : neutralise la détection via console.id getter
+    // Portée volontairement restreinte : seuls les Proxy visant directement
+    // `console` sont concernés (seul vecteur de détection connu — un getter
+    // sur "id" que les DevTools déclenchent en formatant l'objet). Avant,
+    // TOUT `new Proxy(...)` de la page passait par ce patch et son handler
+    // d'origine était muté en place, ce qui pouvait planter sur un handler
+    // gelé (Object.freeze) et ajoutait un coût inutile à des libs comme
+    // Vue/MobX/Immer qui utilisent Proxy intensément sans rapport avec
+    // console. On construit maintenant un handler séparé, sans toucher à
+    // celui fourni par la page.
     try {
-      const _P = window.Proxy;
+      const _P = _devOrigs.Proxy;
       window.Proxy = new _P(_P, {
         construct(target, args) {
           const [obj, handler] = args;
-          if (handler && typeof handler.get === 'function') {
-            const orig = handler.get.bind(handler);
-            handler.get = function (o, prop, recv) {
-              if (prop === 'id' && o === console) return 1;
-              return orig(o, prop, recv);
-            };
+          if (obj === console && handler && typeof handler.get === 'function') {
+            const origGet = handler.get;
+            const safeHandler = Object.assign({}, handler, {
+              get(o2, prop, recv) {
+                if (prop === 'id' && o2 === console) return 1;
+                return origGet.call(handler, o2, prop, recv);
+              },
+            });
+            return new target(obj, safeHandler);
           }
           return new target(obj, handler);
         },
@@ -845,6 +921,7 @@
   const _ovEls   = new WeakMap(); // el → overlayId — remplace el.dataset.uaOvId
   let _ovCnt = 0;
   let _ovlDebTimer = null;
+  let _overlaySweepInterval = null; // resweep périodique (voir _manageOverlaySweep)
 
   // Debounce _sendOverlayList : évite N postMessages si N overlays sont cachés
   // d'un coup (ex: autoRemoveOverlays sur une page avec plusieurs éléments).
@@ -884,29 +961,70 @@
     _scheduleOverlayList();
   }
 
+  // _overlays est une Map forte (pas WeakMap, car on doit pouvoir lister ses
+  // entrées pour le popup) : sans purge, les éléments retirés du DOM par le
+  // site lui-même (navigation SPA, re-render) y resteraient indéfiniment,
+  // retenant des nœuds détachés en mémoire.
+  function _pruneDisconnectedOverlays() {
+    for (const [id, entry] of _overlays) {
+      if (!entry.el.isConnected) {
+        _ovEls.delete(entry.el);
+        _overlays.delete(id);
+      }
+    }
+  }
+
   function _sendOverlayList() {
+    _pruneDisconnectedOverlays();
     const list = [..._overlays.entries()].map(([id, { desc, auto, ts }]) => ({ id, desc, auto, ts }));
     N.PM({ __ch: BUS_OUT, action: 'overlayList', payload: list }, '*');
   }
 
+  // Mots-clés fréquents des overlays de consentement/paywall/abonnement,
+  // indépendants du nom de balise (couvre aussi les web components).
+  const OVERLAY_KEYWORD_SEL =
+    '[class*="paywall"],[id*="paywall"],[class*="cookie"],[id*="cookie"],' +
+    '[class*="consent"],[id*="consent"],[class*="gdpr"],[id*="gdpr"],' +
+    '[class*="modal"],[id*="modal"],[class*="overlay"],[id*="overlay"],' +
+    '[class*="popup"],[id*="popup"],[class*="subscribe"],[id*="subscribe"]';
+
+  const OVERLAY_INTERACTIVE_SEL = 'nav,video,iframe,canvas,form,input,textarea,select,button[type="submit"]';
+
   function autoRemoveOverlays() {
     if (!S.overlays) return;
     try {
-      document.querySelectorAll('div,section,aside,article,header').forEach(el => {
-        if (_ovEls.has(el)) return; // déjà masqué
+      const vw = window.innerWidth, vh = window.innerHeight;
+
+      const tryHide = (el, { requireZIndex, minWidthRatio, minHeightRatio, allowEdgeAnchor }) => {
+        if (_ovEls.has(el)) return;
         const cs = N.GCS(el);
+        if (!['fixed', 'absolute', 'sticky'].includes(cs.position)) return;
         const zi = parseInt(cs.zIndex) || 0;
-        if ((cs.position === 'fixed' || cs.position === 'absolute') && zi > 100) {
-          const r = el.getBoundingClientRect();
-          if (r.width  > window.innerWidth  * 0.75 &&
-              r.height > window.innerHeight * 0.45 &&
-              // Ne jamais supprimer un overlay contenant des éléments interactifs :
-              // modales de login, formulaires de consentement, dialogues natifs, etc.
-              !el.querySelector('nav,video,iframe,canvas,form,input,textarea,select,button[type="submit"]')) {
-            hideOverlay(el, true);
-          }
-        }
+        if (requireZIndex && zi <= 100) return;
+        if (el.querySelector(OVERLAY_INTERACTIVE_SEL)) return;
+        const r = el.getBoundingClientRect();
+        const wideEnough = r.width > vw * minWidthRatio;
+        const tallEnough = r.height > vh * minHeightRatio;
+        const edgeAnchored = allowEdgeAnchor &&
+          (Math.abs(r.top) < 2 || Math.abs(vh - r.bottom) < 2) && r.width > vw * 0.5;
+        if (wideEnough && (tallEnough || edgeAnchored)) hideOverlay(el, true);
+      };
+
+      // Passage 1 : conteneurs génériques probables (comportement historique,
+      // tags étendus) — seuils stricts, sans signal de mot-clé pour appuyer
+      // la décision, donc on évite les faux positifs sur du contenu légitime.
+      document.querySelectorAll('div,section,aside,article,header,footer,dialog').forEach(el => {
+        tryHide(el, { requireZIndex: true, minWidthRatio: 0.75, minHeightRatio: 0.45, allowEdgeAnchor: false });
       });
+
+      // Passage 2 : élément quelconque (y compris web components) dont la
+      // classe/l'id évoque un paywall/bandeau de consentement — seuils
+      // relâchés, car ces bandeaux sont souvent courts mais bloquent quand
+      // même la lecture (ex: barre d'abonnement collée en bas de page).
+      document.querySelectorAll(OVERLAY_KEYWORD_SEL).forEach(el => {
+        tryHide(el, { requireZIndex: false, minWidthRatio: 0.5, minHeightRatio: 0.15, allowEdgeAnchor: true });
+      });
+
       ['overflow','overflow-y','height','max-height'].forEach(p => {
         // N.setProp direct : évite de passer par notre propre patchStyleSetProperty
         if (document.body) N.setProp.call(document.body.style, p, 'auto', 'important');
@@ -915,6 +1033,24 @@
       ['modal-open','overflow-hidden','no-scroll','noscroll','scroll-lock','locked']
         .forEach(c => document.body?.classList.remove(c));
     } catch (_) {}
+  }
+
+  // Resweep périodique — certains overlays sont déjà présents dans le DOM au
+  // chargement mais restent masqués (display:none, classe "hidden"…) jusqu'à
+  // ce que le site les révèle après un délai (ex: bandeau d'abonnement qui
+  // apparaît après quelques secondes de lecture). Ça ne déclenche aucune
+  // mutation childList, donc _needOvl n'est jamais levé pour ce cas. On ne
+  // surveille pas class/style dans le MutationObserver (attributeFilter plus
+  // haut) car ce serait trop coûteux sur les SPA — un balayage léger toutes
+  // les 4s, toujours en idle callback, couvre ce cas à un coût négligeable.
+  function _manageOverlaySweep() {
+    if (S.overlays) {
+      if (_overlaySweepInterval) return;
+      _overlaySweepInterval = N.sI(() => _idle(autoRemoveOverlays), 4000);
+    } else if (_overlaySweepInterval) {
+      clearInterval(_overlaySweepInterval);
+      _overlaySweepInterval = null;
+    }
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -1178,8 +1314,10 @@
 
   // SPA rewrap hoissté au niveau module pour être partagé entre hookSPANavigation
   // et l'intervalle de polling (évite de créer une nouvelle closure à chaque call).
+  let _spaRewrapTimer = null;
   function _spaRewrap() {
-    N.sT(() => { clearInlineHandlers(); if (S.dragdrop) fixDraggable(); applyCSS(); }, 100);
+    clearTimeout(_spaRewrapTimer);
+    _spaRewrapTimer = N.sT(() => { clearInlineHandlers(); if (S.dragdrop) fixDraggable(); applyCSS(); }, 100);
   }
 
   // Sentinel selectionchange : active la fenêtre de blocage
@@ -1372,8 +1510,11 @@
   // ─────────────────────────────────────────────────────────────────────────
   function _shadowCSS() {
     const p = [];
-    if (S.selectstart)   p.push('*{user-select:auto!important;-webkit-user-select:auto!important}');
-    if (S.cursor)        p.push('*{cursor:auto!important;-webkit-touch-callout:default!important}');
+    // Mêmes valeurs que buildCSS() pour le document principal : "auto"
+    // réintroduit le curseur texte au survol de texte brut (déjà corrigé en
+    // v3.0.1) et peut rester hérité d'un user-select:none du composant hôte.
+    if (S.selectstart)   p.push('*{user-select:text!important;-webkit-user-select:text!important;-moz-user-select:text!important}');
+    if (S.cursor)        p.push('*{cursor:default!important;-webkit-touch-callout:default!important}');
     if (S.pointerEvents) p.push('*{pointer-events:auto!important}');
     return p.join('');
   }
@@ -1398,6 +1539,16 @@
     _shadowRoots.delete(root);
   }
 
+  // _shadowRoots est un Set fort : sans purge, un shadow root dont l'hôte a
+  // été retiré du DOM (SPA, composants dynamiques) y resterait indéfiniment,
+  // retenant tout l'arbre détaché en mémoire. Les ShadowRoot n'ont pas de
+  // .isConnected propre — on le déduit de leur élément hôte (.host).
+  function _pruneDisconnectedShadowRoots() {
+    _shadowRoots.forEach(root => {
+      if (!root.host || !root.host.isConnected) _removeFromShadow(root);
+    });
+  }
+
   function patchShadowDOM() {
     const needed = (S.selectstart || S.cursor || S.pointerEvents) && !!N.attachShadow;
     if (needed) {
@@ -1419,6 +1570,7 @@
           });
         } catch (_) {}
       }
+      _pruneDisconnectedShadowRoots();
       // Rafraîchit le CSS des shadow roots déjà suivis (peu coûteux : itère
       // seulement _shadowRoots, pas tout le DOM) — nécessaire pour répercuter
       // un changement de combinaison selectstart/cursor/pointerEvents sans
@@ -1513,6 +1665,8 @@
       _shadowRoots.clear();
       _shadowPatched = false;
     }
+    _restoreDevtools();
+    if (_overlaySweepInterval) { clearInterval(_overlaySweepInterval); _overlaySweepInterval = null; }
     _insertRuleActive  = false;
     _setPropActive     = false;
     _adoptedActive     = false;
@@ -1547,8 +1701,9 @@
     patchGetSelection();
     patchClipboardContent();
     patchShadowDOM();
-    if (S.devtools)  patchDevtools();
+    patchDevtools();
     if (S.overlays)  _idle(autoRemoveOverlays);
+    _manageOverlaySweep();
     if (phase)       runScripts(phase);
   }
 
