@@ -29,6 +29,10 @@
 - **Console Guard** — stops pages from clearing your console history
 - **Custom Scripts** — run your own JavaScript automatically on any page, at the timing you choose, optionally restricted to a specific site or domain
 
+### 🛟 Support
+- **Update Check** — get notified right in the popup when a new version is available, with a direct link to it
+- **Issue Reporting** — spotted a bypass that isn't working? Report it in one click, prefilled with the relevant context, directly on the project's GitHub page
+
 
 ---
 
@@ -66,13 +70,13 @@ The popup is organised into **4 tabs**:
 | **Protections** | Toggle each bypass on or off individually — quick presets at the top let you switch between common configurations instantly |
 | **Overlays** | View and restore elements hidden by the extension |
 | **Scripts** | Create, edit and manage custom JavaScript snippets |
-| **Settings** | Language, theme, save your own defaults, export/import a full backup, factory reset |
+| **Settings** | Language, theme, save your own defaults, export/import a full backup, check for updates, report an issue, factory reset |
 
 **Quick actions** in the toolbar:
 - **Enable All / Disable All** — one-click toggle of all protections
 - **Pick** — click any element on the page to hide it (Escape to cancel)
 - Each protection category also has its own group switch, to enable or disable a whole category (e.g. all mouse-related protections) in a single click
-- A banner under the header lets you disable Overpass entirely on the current site, with no need to touch individual toggles — manage your excluded sites anytime from the Settings tab
+- A banner under the header lets you disable Overpass entirely on the current site, with no need to touch individual toggles — manage your excluded sites anytime from the Settings tab, where you can also exclude a whole domain (all its subdomains included) at once
 - The same banner lets you save the current settings as a profile for that site alone, distinct from your global settings
 - Global keyboard shortcuts (configurable at `chrome://extensions/shortcuts`) let you toggle everything, or just the current site, without opening the popup at all
 
@@ -95,7 +99,52 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.4.1 — Current
+### v3.7.0 — Current
+- **New** — Excluding a site or saving a site profile now also accepts a whole domain (e.g. `*.example.com`) to cover all its subdomains at once, addable directly from Settings
+- **Fixed** — Turning off DevTools Protection now fully reverts it, instead of leaving some of it active until the page is reloaded
+- **Fixed** — Reduced the chance of the DevTools Protection interfering with unrelated site behaviour
+- **Improved** — Auto-hiding of popups now also catches ones that appear a few seconds after the page loads, not just ones present immediately
+- **Improved** — Exporting your settings now also includes your saved defaults, so restoring a backup doesn't leave anything behind
+- **Fixed** — Excluded sites, site profiles, and saved defaults now clearly warn you if a change couldn't be saved instead of failing silently
+- **Fixed** — Factory reset now correctly clears the excluded sites and site profiles shown in Settings right away, instead of only after reopening the popup
+- General cleanup and small reliability improvements
+
+### v3.6.4
+- **Fixed** — You're now warned if a change (like importing a backup with large custom scripts) is too big to be saved, instead of silently failing to persist
+- General cleanup and small reliability improvements
+
+### v3.6.3
+- **Improved** — Smoother performance on single-page apps that navigate frequently, avoiding redundant work right after a page change
+- General cleanup and small reliability improvements
+
+### v3.6.2
+- **Fixed** — Reduced memory usage during long browsing sessions, especially on single-page apps that add and remove a lot of content over time
+- General cleanup and small reliability improvements
+
+### v3.6.1
+- **Improved** — Better coverage for scroll unlocking: keyboard scrolling (spacebar, arrow keys, page up/down) is now restored too, not just mouse wheel and touch
+- **Improved** — Printing restoration is now more reliable against pages that specifically try to hide content when printing
+- **Improved** — Auto-hiding of cookie banners and paywall overlays now catches more cases, including shorter banners anchored to the edge of the screen and elements built with modern web components
+- General cleanup and small reliability improvements
+
+### v3.6.0
+- **New** — The report page now lets you pick which site the issue is about from a dropdown of your open tabs, instead of relying only on automatic detection
+- **Improved** — Reports now include much more complete environment details automatically (exact browser version, operating system, and the full status of every protection) — you only need to fill in the title and description
+- **Improved** — Update checks are now clearer about the difference between "no new version yet" and an actual connection problem
+- General cleanup and small reliability improvements
+
+### v3.5.5
+- **Improved** — Issue reporting now opens a dedicated, full-page report form instead of going straight to GitHub: it shows the auto-detected context clearly (with a timestamp), lets you add your own description, and gives you a live preview before you send anything — nothing leaves your browser until you click "Open on GitHub" or "Copy report" yourself
+- **Improved** — Your report is now saved automatically as you type, so accidentally closing the tab won't make you lose your work
+- **Improved** — When an update is available, the button in Settings now takes you directly to that release's page on GitHub instead of just re-checking
+- General cleanup and small reliability improvements
+
+### v3.5.0
+- **New** — Update check: the popup now tells you when a new version is available, with a direct link to it — a small indicator also appears next to the version number in the header
+- **New** — Issue reporting: report a problem in one click from the Settings tab, or directly from a specific site's banner for context-aware reports — opens a prefilled ticket on the project's GitHub page, no data sent automatically
+- General cleanup and small reliability improvements
+
+### v3.4.1
 - Bug fixes: the "Balanced" quick preset now correctly applies its settings
 - Performance: reduced unnecessary background activity when changing settings
 - General cleanup and small reliability improvements
