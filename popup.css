@@ -1,4 +1,4 @@
-/* ══ Overpass v3.4.1 – popup.css ═══════════════════════════════ */
+/* ══ Overpass v3.7.0 – popup.css ═══════════════════════════════ */
 
 /* ── Dark theme ──────────────────────────────────────────────── */
 .dark {
@@ -82,7 +82,12 @@ body {
   display:flex; align-items:center; justify-content:center; color:var(--green);
 }
 .logo-name { font-size:15px; font-weight:700; letter-spacing:-.3px; color:var(--text); }
-.logo-sub  { font-size:9px; color:var(--dim); font-family:var(--font-mono); margin-top:1px; }
+.logo-sub  { font-size:9px; color:var(--dim); font-family:var(--font-mono); margin-top:1px; display:flex; align-items:center; gap:5px; }
+.update-dot {
+  width:6px; height:6px; border-radius:50%; background:var(--green);
+  box-shadow:0 0 5px var(--green); cursor:pointer; flex-shrink:0;
+  animation:pulse 2s infinite;
+}
 .header-right { display:flex; align-items:center; gap:7px; }
 
 .icon-btn-sm {
@@ -250,6 +255,14 @@ body {
 .site-save-btn.has-profile { color:var(--green); border-color:#22c55e48; background:var(--green-glow); }
 
 /* ── Excluded sites list (Settings) ─────────────────────────────── */
+.excluded-add-row { display:flex; gap:6px; margin-bottom:8px; }
+.excluded-add-input {
+  flex:1; min-width:0; background:var(--input-bg); border:1px solid var(--border2); border-radius:var(--rs);
+  color:var(--text); font-family:var(--font-mono); font-size:11.5px;
+  padding:6px 9px; outline:none; transition:border-color .13s;
+}
+.excluded-add-input::placeholder { color:var(--dim); }
+.excluded-add-input:focus { border-color:var(--green); }
 .excluded-list { display:flex; flex-direction:column; gap:5px; margin-bottom:4px; }
 .excluded-item {
   display:flex; align-items:center; gap:8px; padding:7px 10px;
@@ -398,6 +411,16 @@ body {
 .about-key  { color:var(--dim); }
 .about-val  { color:var(--text); }
 .mono { font-family:var(--font-mono); font-size:10.5px; }
+
+/* ── Support section — mise à jour + signalement ────────────────── */
+.update-row {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-bottom:9px;
+}
+.update-status { font-size:11.5px; color:var(--muted); }
+.update-status.has-update { color:var(--green); font-weight:600; }
+.update-status.checking   { color:var(--dim); }
+.update-status.err        { color:#f87171; }
 
 /* ── Pill buttons ────────────────────────────────────────────── */
 .pill-btn {
