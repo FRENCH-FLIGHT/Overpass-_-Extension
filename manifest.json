@@ -2,12 +2,11 @@
   "manifest_version": 3,
   "name": "Overpass: Page Freedom",
   "short_name": "Overpass",
-  "version": "3.4.1",
+  "version": "3.7.0",
   "description": "Take back control of any web page \u2014 right-click, text selection, clipboard, keyboard shortcuts, overlays, and more.",
   "permissions": [
     "storage",
     "activeTab",
-    "scripting",
     "tabs"
   ],
   "host_permissions": [
