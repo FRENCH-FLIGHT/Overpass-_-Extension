@@ -20,7 +20,7 @@
     </div>
     <div>
       <div class="logo-name">Overpass</div>
-      <div class="logo-sub" id="versionLabel">v3.1.0</div>
+      <div class="logo-sub" id="versionLabel"><span id="versionText">v3.7.0</span><span class="update-dot" id="updateDot" style="display:none" data-i18n-title="updateDotTitle" title="Mise à jour disponible"></span></div>
     </div>
   </div>
   <div class="header-right">
@@ -39,6 +39,12 @@
 <div class="site-bar" id="siteBar" style="display:none">
   <svg class="site-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.7"/><line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.7"/><path d="M12 2c2.5 2.7 4 6.3 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.3-4-10s1.5-7.3 4-10z" stroke="currentColor" stroke-width="1.7"/></svg>
   <span class="site-domain" id="siteDomain"></span>
+  <button class="icon-btn-sm site-save-btn" id="btnSaveSiteProfile">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="icon-btn-sm" id="btnReportSite" data-i18n-title="reportSiteTitle" title="Signaler un problème sur ce site">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+  </button>
   <label class="toggle toggle-sm" id="siteToggleWrap">
     <input type="checkbox" id="siteActiveToggle" checked/>
     <span class="slider"></span>
@@ -85,6 +91,14 @@
 
 <!-- ══ PANEL: PROTECTIONS ══════════════════════════════════════ -->
 <div class="panel active" id="panel-protections">
+
+  <!-- Préréglages rapides -->
+  <div class="presets-row">
+    <span class="presets-label" data-i18n="presetsLabel">Préréglages :</span>
+    <button class="pill-btn btn-ghost preset-btn" id="presetReading" data-i18n="presetReading" data-i18n-title="presetReadingDesc" title="Optimisé pour la lecture d'articles et le contournement de paywalls">Lecture</button>
+    <button class="pill-btn btn-ghost preset-btn" id="presetStealth" data-i18n="presetStealth" data-i18n-title="presetStealthDesc" title="Empreinte minimale : protège la confidentialité sans modifier le comportement du site">Furtif</button>
+    <button class="pill-btn btn-ghost preset-btn" id="presetBalanced" data-i18n="presetBalanced" data-i18n-title="presetBalancedDesc" title="Réglages recommandés par défaut">Équilibré</button>
+  </div>
 
   <!-- Souris & Sélection -->
   <div class="group">
@@ -321,6 +335,10 @@
         <option value="document_idle"  data-i18n="runIdle">Chargement complet (images, scripts…)</option>
       </select>
     </div>
+    <div class="editor-meta">
+      <label class="form-label" data-i18n="matchLabel">Restreindre à un site (optionnel) :</label>
+      <input type="text" class="editor-select editor-match" id="editorMatch" data-i18n-placeholder="matchPlaceholder" placeholder="exemple.com ou *.exemple.com" autocomplete="off" spellcheck="false"/>
+    </div>
     <textarea class="editor-code" id="editorCode" spellcheck="false" data-i18n-placeholder="codePlaceholder"
       placeholder="// Votre JavaScript ici&#10;// Accès complet au contexte de la page&#10;// Exemple : document.title = 'Mon titre';"></textarea>
     <div class="editor-footer">
@@ -369,8 +387,19 @@
   <div class="settings-section">
     <div class="settings-label" data-i18n="settingExcluded">Sites exclus</div>
     <p class="settings-desc" data-i18n="settingExcludedDesc">Désactivez Overpass sur un site via le bandeau en haut du popup ; il apparaîtra ici.</p>
+    <div class="excluded-add-row">
+      <input type="text" class="excluded-add-input" id="excludedAddInput" data-i18n-placeholder="excludedAddPlaceholder" placeholder="exemple.com ou *.exemple.com" autocomplete="off" spellcheck="false"/>
+      <button class="pill-btn btn-green" id="btnAddExcluded" data-i18n="addSite">Ajouter</button>
+    </div>
     <div class="excluded-list" id="excludedList"></div>
     <p class="empty-sub" id="excludedEmpty" data-i18n="excludedEmptyMsg">Aucun site exclu.</p>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-label" data-i18n="settingProfiles">Profils de site</div>
+    <p class="settings-desc" data-i18n="settingProfilesDesc">Un site peut avoir sa propre combinaison de protections, différente du réglage global — enregistrez-la via l'icône dans le bandeau en haut du popup.</p>
+    <div class="excluded-list" id="profilesList"></div>
+    <p class="empty-sub" id="profilesEmpty" data-i18n="profilesEmptyMsg">Aucun profil de site enregistré.</p>
   </div>
 
   <div class="settings-section">
@@ -383,6 +412,16 @@
   </div>
 
   <div class="settings-section">
+    <div class="settings-label" data-i18n="settingBackup">Sauvegarde</div>
+    <p class="settings-desc" data-i18n="settingBackupDesc">Exportez tous vos réglages (protections, scripts, sites exclus) dans un fichier, ou restaurez une sauvegarde précédente.</p>
+    <div class="settings-row">
+      <button class="pill-btn btn-green" id="btnExportSettings" data-i18n="exportSettings">Exporter</button>
+      <button class="pill-btn btn-ghost" id="btnImportSettings" data-i18n="importSettings">Importer</button>
+    </div>
+    <input type="file" id="importFileInput" accept="application/json,.json" style="display:none"/>
+  </div>
+
+  <div class="settings-section">
     <div class="settings-label danger-label" data-i18n="settingFactory">Réinitialisation</div>
     <p class="settings-desc" data-i18n="settingFactoryDesc">Remet tout à zéro et supprime vos scripts personnalisés.</p>
     <button class="pill-btn btn-red-ghost" id="btnFactoryReset" data-i18n="factoryReset">Restaurer les paramètres usine</button>
@@ -391,11 +430,22 @@
   <div class="settings-section">
     <div class="settings-label" data-i18n="settingAbout">À propos</div>
     <div class="about-card">
-      <div class="about-row"><span class="about-key">Version</span><span class="about-val mono" id="aboutVersion">3.1.0</span></div>
+      <div class="about-row"><span class="about-key">Version</span><span class="about-val mono" id="aboutVersion">3.7.0</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutEngine">Moteur</span><span class="about-val mono">MV3 · MAIN world · L1–L9</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutCompat">Compatibilité</span><span class="about-val mono">Chrome 111+ · Edge 111+</span></div>
+      <div class="about-row"><span class="about-key" data-i18n="aboutShortcuts">Raccourcis</span><span class="about-val mono" id="shortcutsLink" data-i18n-title="aboutShortcutsTitle" style="cursor:pointer;text-decoration:underline dotted">chrome://extensions/shortcuts</span></div>
       <div class="about-row"><span class="about-key">License</span><span class="about-val mono">MIT</span></div>
     </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-label" data-i18n="settingSupport">Support</div>
+    <div class="update-row">
+      <span class="update-status" id="updateStatus" data-i18n="updateUpToDate">À jour</span>
+      <button class="pill-btn btn-ghost" id="btnCheckUpdate" data-i18n="checkUpdate">Vérifier</button>
+    </div>
+    <p class="settings-desc" data-i18n="settingReportDesc">Un bypass ne fonctionne pas comme prévu ? Signalez-le pour nous aider à l'améliorer.</p>
+    <button class="pill-btn btn-ghost" id="btnReportIssue" data-i18n="reportIssue">Signaler un problème</button>
   </div>
 
 </div><!-- /panel-settings -->
