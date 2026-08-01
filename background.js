@@ -1,5 +1,5 @@
 /**
- * Overpass v3.4.1 – background.js (Service Worker)
+ * Overpass v3.7.0 – background.js (Service Worker)
  *
  * Responsabilités :
  *   1. Génère et rotation du token d'authentification postMessage
@@ -13,6 +13,107 @@ const FACTORY_DEFAULTS = {
   print: true,        overlays: false,    devtools: false,  consoleProtect: false,
   focus: false,       visibility: true,
 };
+
+// ── Dépôt GitHub — source des releases et des signalements ────────
+const REPO_SLUG = 'FRENCH-FLIGHT/Overpass-_-Extension';
+const REPO_URL  = `https://github.com/${REPO_SLUG}`;
+
+// Fait correspondre un hostname à un motif "exemple.com" (exact) ou
+// "*.exemple.com" (domaine + sous-domaines) — même sémantique que
+// content.js / inject.js, pour que le badge reflète correctement une
+// exclusion ou un profil défini via un motif générique.
+function hostMatchesPattern(host, pattern) {
+  if (!host || typeof pattern !== 'string') return false;
+  const p = pattern.trim().toLowerCase();
+  if (!p) return false;
+  const h = host.toLowerCase();
+  if (p.startsWith('*.')) {
+    const base = p.slice(2);
+    return !!base && (h === base || h.endsWith('.' + base));
+  }
+  return h === p;
+}
+
+function hostInList(host, list) {
+  return Array.isArray(list) && list.some(entry => hostMatchesPattern(host, entry));
+}
+
+function findSiteProfile(host, profiles) {
+  if (!host || !profiles || typeof profiles !== 'object') return null;
+  if (profiles[host]) return profiles[host];
+  let best = null, bestLen = -1;
+  Object.keys(profiles).forEach(key => {
+    const p = key.trim().toLowerCase();
+    if (!p.startsWith('*.')) return;
+    const base = p.slice(2);
+    if (base && hostMatchesPattern(host, key) && base.length > bestLen) {
+      best = profiles[key];
+      bestLen = base.length;
+    }
+  });
+  return best;
+}
+
+// ── Vérification de mise à jour ────────────────────────────────────
+// Lecture seule (api.github.com), throttlée pour rester très en-deçà des
+// limites de l'API publique GitHub. Résultat stocké en storage.local (donné
+// propre à cet appareil, pas synchronisé entre profils).
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
+
+function compareVersions(a, b) {
+  const pa = String(a || '0').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b || '0').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const da = pa[i] || 0, db = pb[i] || 0;
+    if (da !== db) return da > db ? 1 : -1;
+  }
+  return 0;
+}
+
+async function checkForUpdate(force = false) {
+  const current = chrome.runtime.getManifest().version;
+  try {
+    if (!force) {
+      const { updateInfo } = await chrome.storage.local.get({ updateInfo: null });
+      if (updateInfo?.checkedAt && Date.now() - updateInfo.checkedAt < UPDATE_CHECK_INTERVAL_MS) {
+        return updateInfo;
+      }
+    }
+    const res = await fetch(`https://api.github.com/repos/${REPO_SLUG}/releases/latest`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    // 404 signifie qu'aucune Release n'a encore été publiée sur le dépôt
+    // (différent d'un tag ou d'un commit) — état normal et attendu tant que
+    // le projet n'a pas de release, pas un échec de la vérification elle-même.
+    if (res.status === 404) {
+      const info = {
+        latestVersion: null, url: `${REPO_URL}/releases`, hasUpdate: false,
+        noReleases: true, checkedAt: Date.now(), ok: true,
+      };
+      await chrome.storage.local.set({ updateInfo: info });
+      return info;
+    }
+    if (!res.ok) throw new Error('http ' + res.status);
+    const data = await res.json();
+    const latestVersion = String(data.tag_name || '').replace(/^v/i, '');
+    const info = {
+      latestVersion: latestVersion || null,
+      url: data.html_url || `${REPO_URL}/releases/latest`,
+      hasUpdate: latestVersion ? compareVersions(latestVersion, current) > 0 : false,
+      noReleases: false,
+      checkedAt: Date.now(),
+      ok: true,
+    };
+    await chrome.storage.local.set({ updateInfo: info });
+    return info;
+  } catch (_) {
+    // Pas de réseau, API indisponible, ou taux limité — échec réel, on
+    // renvoie le dernier résultat connu s'il existe plutôt que de perdre
+    // l'information précédente.
+    const { updateInfo } = await chrome.storage.local.get({ updateInfo: null });
+    return updateInfo || { ok: false, checkedAt: Date.now() };
+  }
+}
 
 // ── Token de session ─────────────────────────────────────────────
 function generateToken() {
@@ -35,12 +136,14 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     });
   }
   updateAllBadges();
+  checkForUpdate(false);
 });
 
 // Regénère le token à chaque démarrage du navigateur
 chrome.runtime.onStartup.addListener(async () => {
   await chrome.storage.local.set({ __op_token: generateToken() });
   updateAllBadges();
+  checkForUpdate(false);
 });
 
 // ── Messages ─────────────────────────────────────────────────────
@@ -49,6 +152,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 
     case 'getFactoryDefaults':
       reply({ defaults: FACTORY_DEFAULTS });
+      return true;
+
+    case 'checkUpdate':
+      checkForUpdate(true).then(reply);
+      return true;
+
+    case 'getUpdateInfo':
+      chrome.storage.local.get({ updateInfo: null }).then(({ updateInfo }) => reply(updateInfo));
       return true;
 
     default:
@@ -80,14 +191,14 @@ async function updateBadge(tabId) {
     });
 
     const excludedSites = Array.isArray(stored.excludedSites) ? stored.excludedSites : [];
-    if (host && excludedSites.includes(host)) {
+    if (host && hostInList(host, excludedSites)) {
       await chrome.action.setBadgeText({ text: '–', tabId });
       await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR_NEUTRAL, tabId });
       return;
     }
 
     const siteProfiles = (stored.siteProfiles && typeof stored.siteProfiles === 'object') ? stored.siteProfiles : {};
-    const profile = host ? siteProfiles[host] : null;
+    const profile = host ? findSiteProfile(host, siteProfiles) : null;
     const effective = (profile && typeof profile === 'object') ? { ...stored, ...profile } : stored;
     const active = Object.keys(FACTORY_DEFAULTS).filter(k => effective[k]).length;
 
@@ -153,8 +264,8 @@ chrome.commands.onCommand.addListener(async command => {
     try {
       const { excludedSites } = await chrome.storage.sync.get({ excludedSites: [] });
       const list = Array.isArray(excludedSites) ? excludedSites : [];
-      const next = list.includes(hostname)
-        ? list.filter(h => h !== hostname)
+      const next = hostInList(hostname, list)
+        ? list.filter(entry => !hostMatchesPattern(hostname, entry))
         : [...new Set([...list, hostname])];
       // content.js écoute déjà ce changement (storage.onChanged) dans chaque
       // onglet concerné — aucun message direct à envoyer ici.
