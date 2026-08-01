@@ -1,5 +1,5 @@
 /**
- * Overpass v3.4.1 – popup.js
+ * Overpass v3.7.0 – popup.js
  *
  * Sécurité :
  * - Aucun innerHTML avec données non échappées (XSS safe)
@@ -68,6 +68,8 @@ const I18N = {
     settingExcluded:'Sites exclus',
     settingExcludedDesc:'Désactivez Overpass sur un site via le bandeau en haut du popup ; il apparaîtra ici.',
     excludedEmptyMsg:'Aucun site exclu.', removeSite:'Retirer',
+    excludedAddPlaceholder:'exemple.com ou *.exemple.com', addSite:'Ajouter',
+    toastSiteAdded:'✓ Site ajouté aux exclusions', toastInvalidSite:'Adresse de site invalide',
     settingProfiles:'Profils de site',
     settingProfilesDesc:"Un site peut avoir sa propre combinaison de protections, différente du réglage global — enregistrez-la via l'icône dans le bandeau en haut du popup.",
     profilesEmptyMsg:'Aucun profil de site enregistré.',
@@ -86,6 +88,17 @@ const I18N = {
     toastExportDone:'✓ Sauvegarde téléchargée', toastImportDone:'✓ Réglages importés', toastImportError:'Fichier invalide ou illisible',
     confirmImportTitle:'Importer cette sauvegarde ?',
     importSummary: (sc, si, sp) => `Cette sauvegarde contient ${sc} script${sc>1?'s':''} personnalisé${sc>1?'s':''}, ${si} site${si>1?'s':''} exclu${si>1?'s':''} et ${sp} profil${sp>1?'s':''} de site. Vos réglages actuels seront remplacés. Continuer ?`,
+    settingSupport:'Support',
+    updateUpToDate:'À jour', updateChecking:'Vérification…', updateCheckFailed:'Échec de la vérification',
+    toastStorageQuotaExceeded:'⚠ Trop volumineux pour être sauvegardé — réduisez la taille de vos scripts',
+    updateNoReleases:'Aucune version publiée pour l\u2019instant',
+    updateAvailable: v => `Version ${v} disponible`,
+    checkUpdate:'Vérifier', goToRelease:'Mettre à jour',
+    toastUpdateAvailable: v => `✓ Version ${v} disponible !`, toastUpdateNone:'Vous êtes déjà à jour',
+    updateDotTitle:'Mise à jour disponible — cliquer pour en savoir plus',
+    settingReportDesc:"Un bypass ne fonctionne pas comme prévu ? Signalez-le pour nous aider à l'améliorer.",
+    reportIssue:'Signaler un problème',
+    reportSiteTitle:'Signaler un problème sur ce site',
     settingFactory:'Réinitialisation',
     settingFactoryDesc:'Remet tout à zéro et supprime vos scripts personnalisés.',
     factoryReset:'Restaurer les paramètres usine',
@@ -169,6 +182,8 @@ const I18N = {
     settingExcluded:'Excluded sites',
     settingExcludedDesc:'Disable Overpass on a site using the banner at the top of the popup; it will appear here.',
     excludedEmptyMsg:'No excluded sites.', removeSite:'Remove',
+    excludedAddPlaceholder:'example.com or *.example.com', addSite:'Add',
+    toastSiteAdded:'✓ Site added to exclusions', toastInvalidSite:'Invalid site address',
     settingProfiles:'Site profiles',
     settingProfilesDesc:'A site can have its own combination of protections, different from the global setting — save it using the icon in the banner at the top of the popup.',
     profilesEmptyMsg:'No site profiles saved.',
@@ -187,6 +202,17 @@ const I18N = {
     toastExportDone:'✓ Backup downloaded', toastImportDone:'✓ Settings imported', toastImportError:'Invalid or unreadable file',
     confirmImportTitle:'Import this backup?',
     importSummary: (sc, si, sp) => `This backup contains ${sc} custom script${sc>1?'s':''}, ${si} excluded site${si>1?'s':''} and ${sp} site profile${sp>1?'s':''}. Your current settings will be replaced. Continue?`,
+    settingSupport:'Support',
+    updateUpToDate:'Up to date', updateChecking:'Checking…', updateCheckFailed:'Check failed',
+    toastStorageQuotaExceeded:'⚠ Too large to save — try reducing the size of your scripts',
+    updateNoReleases:'No version published yet',
+    updateAvailable: v => `Version ${v} available`,
+    checkUpdate:'Check', goToRelease:'Update',
+    toastUpdateAvailable: v => `✓ Version ${v} available!`, toastUpdateNone:"You're already up to date",
+    updateDotTitle:'Update available — click to learn more',
+    settingReportDesc:"A bypass isn't working as expected? Report it to help us improve.",
+    reportIssue:'Report an issue',
+    reportSiteTitle:'Report an issue on this site',
     settingFactory:'Reset',
     settingFactoryDesc:'Reset everything: removes custom scripts and restores original settings.',
     factoryReset:'Restore factory settings',
@@ -270,6 +296,8 @@ const I18N = {
     settingExcluded:'Sitios excluidos',
     settingExcludedDesc:'Desactiva Overpass en un sitio con el banner superior; aparecerá aquí.',
     excludedEmptyMsg:'Sin sitios excluidos.', removeSite:'Quitar',
+    excludedAddPlaceholder:'ejemplo.com o *.ejemplo.com', addSite:'Añadir',
+    toastSiteAdded:'✓ Sitio añadido a las exclusiones', toastInvalidSite:'Dirección de sitio no válida',
     settingProfiles:'Perfiles de sitio',
     settingProfilesDesc:'Un sitio puede tener su propia combinación de protecciones, distinta del ajuste global — guárdala con el icono del banner superior del popup.',
     profilesEmptyMsg:'Sin perfiles de sitio guardados.',
@@ -288,6 +316,17 @@ const I18N = {
     toastExportDone:'✓ Copia descargada', toastImportDone:'✓ Ajustes importados', toastImportError:'Archivo inválido o ilegible',
     confirmImportTitle:'¿Importar esta copia de seguridad?',
     importSummary: (sc, si, sp) => `Esta copia contiene ${sc} script${sc>1?'s':''} personalizado${sc>1?'s':''}, ${si} sitio${si>1?'s':''} excluido${si>1?'s':''} y ${sp} perfil${sp>1?'es':''} de sitio. Tus ajustes actuales serán reemplazados. ¿Continuar?`,
+    settingSupport:'Soporte',
+    updateUpToDate:'Actualizado', updateChecking:'Comprobando…', updateCheckFailed:'Fallo al comprobar',
+    toastStorageQuotaExceeded:'⚠ Demasiado grande para guardar — reduce el tamaño de tus scripts',
+    updateNoReleases:'Aún no hay versiones publicadas',
+    updateAvailable: v => `Versión ${v} disponible`,
+    checkUpdate:'Comprobar', goToRelease:'Actualizar',
+    toastUpdateAvailable: v => `✓ ¡Versión ${v} disponible!`, toastUpdateNone:'Ya tienes la última versión',
+    updateDotTitle:'Actualización disponible — clic para saber más',
+    settingReportDesc:'¿Un bypass no funciona como debería? Repórtalo para ayudarnos a mejorar.',
+    reportIssue:'Reportar un problema',
+    reportSiteTitle:'Reportar un problema en este sitio',
     settingFactory:'Restablecimiento',
     settingFactoryDesc:'Reinicia todo: elimina scripts y restaura ajustes originales.',
     factoryReset:'Restaurar ajustes de fábrica',
@@ -371,6 +410,8 @@ const I18N = {
     settingExcluded:'Ausgeschlossene Seiten',
     settingExcludedDesc:'Deaktiviere Overpass über die Leiste oben im Popup; die Seite erscheint dann hier.',
     excludedEmptyMsg:'Keine ausgeschlossenen Seiten.', removeSite:'Entfernen',
+    excludedAddPlaceholder:'beispiel.de oder *.beispiel.de', addSite:'Hinzufügen',
+    toastSiteAdded:'✓ Seite zu Ausschlüssen hinzugefügt', toastInvalidSite:'Ungültige Seitenadresse',
     settingProfiles:'Seitenprofile',
     settingProfilesDesc:'Eine Seite kann ihre eigene Kombination von Schutzfunktionen haben, abweichend von der globalen Einstellung — speichere sie über das Symbol in der Leiste oben im Popup.',
     profilesEmptyMsg:'Keine Seitenprofile gespeichert.',
@@ -389,6 +430,17 @@ const I18N = {
     toastExportDone:'✓ Sicherung heruntergeladen', toastImportDone:'✓ Einstellungen importiert', toastImportError:'Ungültige oder unlesbare Datei',
     confirmImportTitle:'Diese Sicherung importieren?',
     importSummary: (sc, si, sp) => `Diese Sicherung enthält ${sc} benutzerdefiniertes Skript${sc>1?'e':''}, ${si} ausgeschlossene Seite${si>1?'n':''} und ${sp} Seitenprofil${sp>1?'e':''}. Deine aktuellen Einstellungen werden ersetzt. Fortfahren?`,
+    settingSupport:'Support',
+    updateUpToDate:'Aktuell', updateChecking:'Wird geprüft…', updateCheckFailed:'Prüfung fehlgeschlagen',
+    toastStorageQuotaExceeded:'⚠ Zu groß zum Speichern — verkleinere deine Skripte',
+    updateNoReleases:'Noch keine Version veröffentlicht',
+    updateAvailable: v => `Version ${v} verfügbar`,
+    checkUpdate:'Prüfen', goToRelease:'Aktualisieren',
+    toastUpdateAvailable: v => `✓ Version ${v} verfügbar!`, toastUpdateNone:'Du bist bereits auf dem neuesten Stand',
+    updateDotTitle:'Update verfügbar — klicken für mehr Infos',
+    settingReportDesc:'Funktioniert ein Bypass nicht wie erwartet? Melde es, damit wir die Erweiterung verbessern können.',
+    reportIssue:'Problem melden',
+    reportSiteTitle:'Problem auf dieser Seite melden',
     settingFactory:'Zurücksetzen',
     settingFactoryDesc:'Alles zurücksetzen: löscht Skripte und stellt Originaleinstellungen wieder her.',
     factoryReset:'Werkseinstellungen',
@@ -421,7 +473,7 @@ const I18N = {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const VERSION = '3.4.1';
+const VERSION = '3.7.0';
 
 const FEATURE_GROUPS = {
   mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
@@ -474,6 +526,7 @@ let toastTimer       = null;
 let excludedSites    = [];
 let siteProfiles     = {};
 let currentHostname  = '';
+let updateInfo       = null;
 
 // ════════════════════════════════════════════════════════════════
 // HELPERS
@@ -496,22 +549,56 @@ function getHostname(url) {
   try { return new URL(url).hostname || ''; } catch (_) { return ''; }
 }
 
+// Même sémantique que hostMatchesPattern() côté content.js/background.js :
+// "exemple.com" (exact) ou "*.exemple.com" (domaine + sous-domaines) — les
+// sites exclus et les profils de site supportent tous deux ce motif.
+function hostMatchesPattern(host, pattern) {
+  if (!host || typeof pattern !== 'string') return false;
+  const p = pattern.trim().toLowerCase();
+  if (!p) return false;
+  const h = host.toLowerCase();
+  if (p.startsWith('*.')) {
+    const base = p.slice(2);
+    return !!base && (h === base || h.endsWith('.' + base));
+  }
+  return h === p;
+}
+
+function hostInList(host, list) {
+  return Array.isArray(list) && list.some(entry => hostMatchesPattern(host, entry));
+}
+
+function findSiteProfile(host, profiles) {
+  if (!host || !profiles || typeof profiles !== 'object') return null;
+  if (profiles[host]) return profiles[host];
+  let best = null, bestLen = -1;
+  Object.keys(profiles).forEach(key => {
+    const p = key.trim().toLowerCase();
+    if (!p.startsWith('*.')) return;
+    const base = p.slice(2);
+    if (base && hostMatchesPattern(host, key) && base.length > bestLen) {
+      best = profiles[key];
+      bestLen = base.length;
+    }
+  });
+  return best;
+}
+
 // ════════════════════════════════════════════════════════════════
 // SITE BAR — exclusion d'Overpass sur le site de l'onglet actif
-// ════════════════════════════════════════════════════════════════
 function updateSiteBar() {
   const bar = document.getElementById('siteBar');
   const inp = document.getElementById('siteActiveToggle');
   const domainEl = document.getElementById('siteDomain');
   const saveBtn = document.getElementById('btnSaveSiteProfile');
   if (!bar || !inp || !domainEl || !currentHostname) return;
-  const excluded = excludedSites.includes(currentHostname);
+  const excluded = hostInList(currentHostname, excludedSites);
   inp.checked = !excluded;
   bar.classList.toggle('excluded', excluded);
   domainEl.textContent = currentHostname;
   domainEl.title = currentHostname;
   if (saveBtn) {
-    const hasProfile = !!siteProfiles[currentHostname];
+    const hasProfile = !!findSiteProfile(currentHostname, siteProfiles);
     saveBtn.classList.toggle('has-profile', hasProfile);
     saveBtn.title = t(hasProfile ? 'siteProfileUpdateTitle' : 'siteProfileSaveTitle');
   }
@@ -519,10 +606,16 @@ function updateSiteBar() {
 
 async function setSiteExcluded(excluded) {
   if (!currentHostname) return;
-  excludedSites = excluded
+  // Réactiver le site doit garantir qu'il redevient actif : on retire donc
+  // toute entrée qui le concerne, exacte ou wildcard (ex: une règle
+  // "*.exemple.com" ajoutée depuis les Paramètres). Exclure ajoute
+  // uniquement le hostname exact, sans jamais promouvoir en wildcard.
+  const next = excluded
     ? [...new Set([...excludedSites, currentHostname])]
-    : excludedSites.filter(h => h !== currentHostname);
-  await chrome.storage.sync.set({ excludedSites });
+    : excludedSites.filter(entry => !hostMatchesPattern(currentHostname, entry));
+  const ok = await syncSet({ excludedSites: next });
+  if (!ok) return;
+  excludedSites = next;
   updateSiteBar();
   renderExcludedList();
   toast(t(excluded ? 'toastSiteExcluded' : 'toastSiteIncluded'), excluded ? 'info' : 'ok');
@@ -534,15 +627,17 @@ async function setSiteExcluded(excluded) {
 async function saveSiteProfile() {
   if (!currentHostname) return;
   const existing = siteProfiles[currentHostname];
-  const ok = await showConfirm(
+  const confirmed = await showConfirm(
     existing ? 'confirmUpdateProfileTitle' : 'confirmSaveProfileTitle',
     null, t('confirmProfileMsg', currentHostname)
   );
-  if (!ok) return;
+  if (!confirmed) return;
   const snap = {};
   Object.keys(FACTORY_DEFAULTS).forEach(k => { snap[k] = !!cfg[k]; });
-  siteProfiles = { ...siteProfiles, [currentHostname]: snap };
-  await chrome.storage.sync.set({ siteProfiles });
+  const next = { ...siteProfiles, [currentHostname]: snap };
+  const ok = await syncSet({ siteProfiles: next });
+  if (!ok) return;
+  siteProfiles = next;
   updateSiteBar();
   renderProfilesList();
   toast(t('toastProfileSaved'));
@@ -551,8 +646,9 @@ async function saveSiteProfile() {
 async function removeSiteProfile(host) {
   const next = { ...siteProfiles };
   delete next[host];
+  const ok = await syncSet({ siteProfiles: next });
+  if (!ok) return;
   siteProfiles = next;
-  await chrome.storage.sync.set({ siteProfiles });
   renderProfilesList();
   updateSiteBar();
 }
@@ -597,6 +693,7 @@ function initSiteBar() {
   bar.style.display = 'flex';
   inp.addEventListener('change', () => setSiteExcluded(!inp.checked));
   document.getElementById('btnSaveSiteProfile')?.addEventListener('click', saveSiteProfile);
+  document.getElementById('btnReportSite')?.addEventListener('click', reportSite);
 }
 
 function renderExcludedList() {
@@ -622,8 +719,10 @@ function renderExcludedList() {
     btn.title = t('removeSite');
     btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
     btn.addEventListener('click', async () => {
-      excludedSites = excludedSites.filter(h => h !== host);
-      await chrome.storage.sync.set({ excludedSites });
+      const next = excludedSites.filter(h => h !== host);
+      const ok = await syncSet({ excludedSites: next });
+      if (!ok) return;
+      excludedSites = next;
       renderExcludedList();
       updateSiteBar();
     });
@@ -631,6 +730,43 @@ function renderExcludedList() {
     item.appendChild(span);
     item.appendChild(btn);
     container.appendChild(item);
+  });
+}
+
+// Normalise une entrée de site tapée manuellement : accepte un préfixe
+// wildcard "*.", retire protocole/chemin/port collés par erreur — même
+// nettoyage que le champ "Restreindre à un site" des scripts personnalisés,
+// pour que la syntaxe reste cohérente dans toute l'extension.
+function normalizeSitePattern(raw) {
+  let val = (raw || '').trim().toLowerCase();
+  const isWildcard = val.startsWith('*.');
+  let host = isWildcard ? val.slice(2) : val;
+  host = host.replace(/^[a-z]+:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+  return (isWildcard ? `*.${host}` : host);
+}
+
+async function addExcludedSite() {
+  const inp = document.getElementById('excludedAddInput');
+  if (!inp) return;
+  const pattern = normalizeSitePattern(inp.value);
+  const bareHost = pattern.startsWith('*.') ? pattern.slice(2) : pattern;
+  if (!bareHost || !bareHost.includes('.')) { toast(t('toastInvalidSite'), 'err'); return; }
+  if (excludedSites.some(e => e.toLowerCase() === pattern)) { inp.value = ''; return; }
+  const next = [...excludedSites, pattern];
+  const ok = await syncSet({ excludedSites: next });
+  if (!ok) return;
+  excludedSites = next;
+  inp.value = '';
+  renderExcludedList();
+  updateSiteBar();
+  toast(t('toastSiteAdded'));
+}
+
+function initExcludedSitesInput() {
+  const inp = document.getElementById('excludedAddInput');
+  document.getElementById('btnAddExcluded')?.addEventListener('click', addExcludedSite);
+  inp?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addExcludedSite(); }
   });
 }
 
@@ -667,6 +803,24 @@ function showConfirm(titleKey, msgKey, rawMsg = null) {
 // ════════════════════════════════════════════════════════════════
 // SEND TO CONTENT SCRIPT
 // ════════════════════════════════════════════════════════════════
+// Écrit dans chrome.storage.sync et signale honnêtement un dépassement de
+// quota (item >8Ko, ou trop d'écritures/minute) au lieu de laisser
+// l'appelant croire que la sauvegarde a réussi. Retourne true/false pour
+// que l'appelant ne mette à jour son état local qu'après un succès réel —
+// sinon la variable en mémoire du popup se désynchronise silencieusement
+// du storage jusqu'à sa prochaine réouverture.
+async function syncSet(obj) {
+  try {
+    await chrome.storage.sync.set(obj);
+    return true;
+  } catch (err) {
+    if (/quota/i.test(err?.message || '')) {
+      toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+    }
+    return false;
+  }
+}
+
 async function send(action, extra = {}) {
   if (!tabId) return;
   try {
@@ -705,9 +859,17 @@ async function applySettings(patch) {
     const toStore = { ...safe };
     if ('customScripts' in toStore) toStore.customScripts = JSON.stringify(toStore.customScripts);
     await chrome.storage.sync.set(toStore);
-  } catch (_) {
-    // échec de synchro réseau : la page a déjà le bon état, seule
-    // la persistance cross-appareil est affectée
+  } catch (err) {
+    // Un dépassement de quota (chrome.storage.sync limite chaque élément à
+    // 8 Ko — facilement atteint avec plusieurs scripts personnalisés,
+    // notamment après un import) doit être signalé : sans ça, l'utilisateur
+    // croit que son changement est enregistré alors qu'il ne survivra pas
+    // au redémarrage du navigateur. Les autres échecs (réseau, etc.) restent
+    // silencieux — la page a déjà le bon état, seule la persistance cross-
+    // appareil est affectée, et retenter à chaque toggle serait trop bruyant.
+    if (/quota/i.test(err?.message || '')) {
+      toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+    }
   }
   setTimeout(() => syncing(false), 500);
 }
@@ -792,13 +954,15 @@ function updateUI() {
 // ════════════════════════════════════════════════════════════════
 // TABS
 // ════════════════════════════════════════════════════════════════
+function switchToTab(tabName) {
+  document.querySelectorAll('.tab, .panel').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${tabName}"]`)?.classList.add('active');
+  document.getElementById(`panel-${tabName}`)?.classList.add('active');
+}
+
 function initTabs() {
   document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab, .panel').forEach(el => el.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById(`panel-${tab.dataset.tab}`)?.classList.add('active');
-    });
+    tab.addEventListener('click', () => switchToTab(tab.dataset.tab));
   });
 }
 
@@ -1183,9 +1347,23 @@ function applyTheme(newTheme) {
 // ════════════════════════════════════════════════════════════════
 // EXPORT / IMPORT — sauvegarde complète des réglages
 // ════════════════════════════════════════════════════════════════
-function exportSettings() {
+async function exportSettings() {
   const settings = {};
   Object.keys(FACTORY_DEFAULTS).forEach(k => { settings[k] = !!cfg[k]; });
+
+  // userDefaults n'est pas gardé dans une variable JS (seulement écrit dans
+  // le storage par "Sauvegarder comme défaut") — on va le chercher au moment
+  // de l'export, sinon une sauvegarde/restauration le perdait silencieusement.
+  let userDefaults = null;
+  try {
+    const stored = await chrome.storage.sync.get({ userDefaults: null });
+    if (stored.userDefaults) {
+      const snap = JSON.parse(stored.userDefaults);
+      const safe = {};
+      Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in snap) safe[k] = !!snap[k]; });
+      userDefaults = safe;
+    }
+  } catch (_) {}
 
   const data = {
     _meta: { app: 'Overpass', version: VERSION, exportedAt: new Date().toISOString() },
@@ -1193,6 +1371,7 @@ function exportSettings() {
     customScripts: cfg.customScripts || [],
     excludedSites,
     siteProfiles,
+    userDefaults,
     language: lang,
     theme,
   };
@@ -1262,10 +1441,21 @@ function parseBackupFile(text) {
   const language = ['fr', 'en', 'es', 'de'].includes(data.language) ? data.language : null;
   const theme    = ['dark', 'light'].includes(data.theme) ? data.theme : null;
 
+  // userDefaults : mêmes clés que "settings", filtrées de la même façon —
+  // ne jamais faire confiance à un fichier externe.
+  let userDefaults = null;
+  if (data.userDefaults && typeof data.userDefaults === 'object' && !Array.isArray(data.userDefaults)) {
+    const safe = {};
+    let any = false;
+    Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in data.userDefaults) { safe[k] = !!data.userDefaults[k]; any = true; } });
+    if (any) userDefaults = safe;
+  }
+
   return {
     settings, customScripts,
     excludedSites: excludedSitesImported,
     siteProfiles: siteProfilesImported,
+    userDefaults,
     language, theme,
   };
 }
@@ -1285,7 +1475,8 @@ async function handleImportFile(file) {
   if (!ok) return;
 
   // Toggles + scripts : passe par applySettings (application live immédiate,
-  // puis persistance — même chemin que tous les autres réglages).
+  // puis persistance — même chemin que tous les autres réglages, avec la
+  // même détection de quota).
   await applySettings({ ...parsed.settings, customScripts: parsed.customScripts });
 
   // excludedSites / siteProfiles / language / theme : remplacement complet
@@ -1296,7 +1487,11 @@ async function handleImportFile(file) {
   const toStore = { excludedSites, siteProfiles };
   if (parsed.language) { lang = parsed.language; toStore.language = lang; }
   if (parsed.theme)    { theme = parsed.theme;   toStore.theme    = theme; }
-  try { await chrome.storage.sync.set(toStore); } catch (_) {}
+  if (parsed.userDefaults) toStore.userDefaults = JSON.stringify(parsed.userDefaults);
+  let quotaExceeded = false;
+  try { await chrome.storage.sync.set(toStore); } catch (err) {
+    if (/quota/i.test(err?.message || '')) quotaExceeded = true;
+  }
 
   if (parsed.language) applyI18n();
   if (parsed.theme)    applyTheme(theme);
@@ -1304,7 +1499,85 @@ async function handleImportFile(file) {
   renderExcludedList();
   renderProfilesList();
 
-  toast(t('toastImportDone'));
+  // Le toast final doit rester honnête : si l'écriture des sites exclus/
+  // profils a échoué pour cause de quota, l'utilisateur doit le savoir
+  // plutôt que de croire l'import entièrement persisté.
+  if (quotaExceeded) toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+  else toast(t('toastImportDone'));
+}
+
+// ════════════════════════════════════════════════════════════════
+// UPDATE CHECK — lecture seule depuis background.js (throttlé côté background)
+// ════════════════════════════════════════════════════════════════
+function renderUpdateStatus() {
+  const el = document.getElementById('updateStatus');
+  const dot = document.getElementById('updateDot');
+  const btn = document.getElementById('btnCheckUpdate');
+  const hasUpdate = !!(updateInfo && updateInfo.hasUpdate && updateInfo.latestVersion);
+  if (dot) dot.style.display = hasUpdate ? '' : 'none';
+  if (btn) setText(btn, hasUpdate ? t('goToRelease') : t('checkUpdate'));
+  if (!el) return;
+  el.classList.remove('has-update', 'checking', 'err');
+  if (!updateInfo || updateInfo.ok === false) {
+    el.textContent = t('updateCheckFailed');
+    el.classList.add('err');
+  } else if (updateInfo.noReleases) {
+    // 404 côté GitHub : le dépôt n'a simplement aucune Release publiée pour
+    // l'instant — ce n'est pas un échec du mécanisme, donc pas de style err.
+    el.textContent = t('updateNoReleases');
+  } else if (hasUpdate) {
+    el.textContent = t('updateAvailable', updateInfo.latestVersion);
+    el.classList.add('has-update');
+  } else {
+    el.textContent = t('updateUpToDate');
+  }
+}
+
+async function loadUpdateInfo() {
+  try {
+    updateInfo = await chrome.runtime.sendMessage({ action: 'getUpdateInfo' });
+  } catch (_) { updateInfo = null; }
+  renderUpdateStatus();
+}
+
+async function checkUpdateNow() {
+  const el = document.getElementById('updateStatus');
+  if (el) { el.textContent = t('updateChecking'); el.classList.add('checking'); }
+  try {
+    updateInfo = await chrome.runtime.sendMessage({ action: 'checkUpdate' });
+  } catch (_) { updateInfo = { ok: false }; }
+  renderUpdateStatus();
+  if (updateInfo?.hasUpdate) toast(t('toastUpdateAvailable', updateInfo.latestVersion));
+  else if (updateInfo?.ok === false) toast(t('updateCheckFailed'), 'err');
+  else if (updateInfo?.noReleases) toast(t('updateNoReleases'), 'info');
+  else toast(t('toastUpdateNone'), 'info');
+}
+
+// Le bouton change de rôle selon l'état : "Vérifier" relance une vérification,
+// "Mettre à jour" (quand une nouvelle version existe) amène directement sur
+// sa page de release GitHub — l'auto-installation n'étant pas possible pour
+// une extension distribuée hors Web Store, c'est la voie la plus directe.
+function handleUpdateButtonClick() {
+  if (updateInfo?.hasUpdate && updateInfo.url) {
+    chrome.tabs.create({ url: updateInfo.url });
+  } else {
+    checkUpdateNow();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// REPORTING — ouvre la page de signalement dédiée (report.html) en onglet
+// complet. Toute la construction du rapport (contexte, aperçu, envoi vers
+// GitHub) y est gérée de façon autonome ; popup.js ne fait que naviguer.
+// ════════════════════════════════════════════════════════════════
+function reportGeneral() {
+  chrome.tabs.create({ url: chrome.runtime.getURL('report.html') });
+}
+
+function reportSite() {
+  if (!currentHostname) { reportGeneral(); return; }
+  const url = chrome.runtime.getURL('report.html') + '?' + new URLSearchParams({ site: currentHostname });
+  chrome.tabs.create({ url });
 }
 
 function initSettings() {
@@ -1331,8 +1604,8 @@ function initSettings() {
   document.getElementById('btnSaveDefaults')?.addEventListener('click', async () => {
     const snap = {};
     Object.keys(FACTORY_DEFAULTS).forEach(k => snap[k] = cfg[k]);
-    await chrome.storage.sync.set({ userDefaults: JSON.stringify(snap) });
-    toast(t('toastDefaultsSaved'));
+    const ok = await syncSet({ userDefaults: JSON.stringify(snap) });
+    if (ok) toast(t('toastDefaultsSaved'));
   });
 
   // Charger défauts
@@ -1370,8 +1643,19 @@ function initSettings() {
     try {
       await chrome.storage.sync.clear();
       await chrome.storage.sync.set({ ...FACTORY_DEFAULTS, customScripts: '[]', language: lang, theme });
-    } catch (_) {}
-    toast(t('toastFactoryDone'));
+      // storage.sync.clear() efface aussi excludedSites/siteProfiles/
+      // userDefaults, mais les variables en mémoire du popup ne le
+      // reflétaient pas : les listes "Sites exclus"/"Profils" restaient
+      // affichées avec l'ancien contenu tant que le popup n'était pas rouvert.
+      excludedSites = [];
+      siteProfiles  = {};
+      renderExcludedList();
+      renderProfilesList();
+      updateSiteBar();
+      toast(t('toastFactoryDone'));
+    } catch (err) {
+      if (/quota/i.test(err?.message || '')) toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+    }
   });
 
   // Raccourcis clavier — copie le chemin plutôt que de tenter une navigation
@@ -1383,8 +1667,16 @@ function initSettings() {
     } catch (_) {}
   });
 
+  // Mise à jour et signalement
+  document.getElementById('btnCheckUpdate')?.addEventListener('click', handleUpdateButtonClick);
+  document.getElementById('btnReportIssue')?.addEventListener('click', reportGeneral);
+  document.getElementById('updateDot')?.addEventListener('click', () => {
+    if (updateInfo?.url) chrome.tabs.create({ url: updateInfo.url });
+    else switchToTab('settings');
+  });
+
   // Labels version
-  const vl = document.getElementById('versionLabel');
+  const vl = document.getElementById('versionText');
   const av = document.getElementById('aboutVersion');
   if (vl) vl.textContent = `v${VERSION}`;
   if (av) av.textContent = VERSION;
@@ -1477,8 +1769,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   initOverlayPanel();
   initScriptEditor();
   initSettings();
+  initExcludedSitesInput();
   initRuntimeMessages();
   await loadSettings();
+  loadUpdateInfo();
 
   // Synchronisation cross-fenêtre
   chrome.storage.onChanged.addListener(changes => {
