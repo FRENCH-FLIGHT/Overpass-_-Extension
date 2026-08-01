@@ -1,5 +1,5 @@
 /**
- * Overpass v3.4.1 – content.js  (ISOLATED world, run_at: document_start)
+ * Overpass v3.7.0 – content.js  (ISOLATED world, run_at: document_start)
  *
  * Rôle : pont sécurisé entre chrome.storage/runtime et inject.js (MAIN world).
  *
@@ -33,6 +33,45 @@
     let any = false;
     Object.keys(DEFAULTS).forEach(k => { if (k in p) { safe[k] = !!p[k]; any = true; } });
     return any ? safe : null;
+  }
+
+  // Fait correspondre un hostname à un motif "exemple.com" (exact) ou
+  // "*.exemple.com" (ce domaine + tous ses sous-domaines) — même sémantique
+  // que matchesSite() côté inject.js pour les scripts personnalisés, pour
+  // que sites exclus et profils de site supportent eux aussi les wildcards.
+  function hostMatchesPattern(host, pattern) {
+    if (!host || typeof pattern !== 'string') return false;
+    const p = pattern.trim().toLowerCase();
+    if (!p) return false;
+    const h = host.toLowerCase();
+    if (p.startsWith('*.')) {
+      const base = p.slice(2);
+      return !!base && (h === base || h.endsWith('.' + base));
+    }
+    return h === p;
+  }
+
+  function hostInList(host, list) {
+    return Array.isArray(list) && list.some(entry => hostMatchesPattern(host, entry));
+  }
+
+  // Résout le profil applicable à un hostname : correspondance exacte
+  // prioritaire, sinon le motif wildcard le plus spécifique (base la plus
+  // longue) parmi ceux qui matchent.
+  function findSiteProfile(host, profiles) {
+    if (!host || !profiles || typeof profiles !== 'object') return null;
+    if (profiles[host]) return profiles[host];
+    let best = null, bestLen = -1;
+    Object.keys(profiles).forEach(key => {
+      const p = key.trim().toLowerCase();
+      if (!p.startsWith('*.')) return;
+      const base = p.slice(2);
+      if (base && hostMatchesPattern(host, key) && base.length > bestLen) {
+        best = profiles[key];
+        bestLen = base.length;
+      }
+    });
+    return best;
   }
 
   // ── Envoi sécurisé vers inject.js ──────────────────────────────
@@ -99,8 +138,8 @@
         try { scripts = JSON.parse(raw.customScripts ?? '[]'); } catch (_) {}
         // Retirer les clés non-toggle pour rester dans ALLOWED_KEYS côté inject.js.
         const { language, customScripts: _rawScripts, excludedSites, siteProfiles, ...toggles } = raw;
-        const excluded = Array.isArray(excludedSites) && excludedSites.includes(location.hostname);
-        const rawProfile = (siteProfiles && typeof siteProfiles === 'object') ? siteProfiles[location.hostname] : null;
+        const excluded = Array.isArray(excludedSites) && hostInList(location.hostname, excludedSites);
+        const rawProfile = (siteProfiles && typeof siteProfiles === 'object') ? findSiteProfile(location.hostname, siteProfiles) : null;
         current = {
           ...DEFAULTS, ...toggles, customScripts: scripts, lang: language || 'fr',
           excluded, siteOverride: sanitizeProfile(rawProfile),
@@ -141,41 +180,39 @@
     return true;
   });
 
-  // ── Synchronisation langue ───────────────────────────────────────
-  // La langue peut être changée depuis le popup sans toucher aux toggles
-  // (donc sans passer par 'updateSettings'). On écoute storage.onChanged
-  // pour répercuter le changement vers inject.js sans recharger la page.
+  // ── Synchronisation langue / exclusion / profil de site ──────────
+  // Fusionnés en un seul listener storage.onChanged (au lieu de trois) :
+  // chaque changement de storage ne réveille ainsi qu'un seul callback,
+  // qui ignore les clés qui ne le concernent pas.
+  //
+  // - Langue : peut être changée depuis le popup sans toucher aux toggles
+  //   (donc sans passer par 'updateSettings').
+  // - Exclusion / profil de site : le popup écrit directement dans
+  //   chrome.storage.sync (il connaît le hostname de l'onglet actif sans
+  //   passer par content.js) — chaque frame réévalue ici si SON PROPRE
+  //   location.hostname est concerné, ce qui couvre aussi les autres
+  //   onglets ouverts sur le même site.
   chrome.storage.onChanged.addListener(changes => {
-    if (!changes.language) return;
-    current.lang = changes.language.newValue || 'fr';
-    toInject('update', { lang: current.lang });
-  });
+    if (changes.language) {
+      current.lang = changes.language.newValue || 'fr';
+      toInject('update', { lang: current.lang });
+    }
 
-  // ── Synchronisation exclusion de site ────────────────────────────
-  // Le popup écrit directement excludedSites dans chrome.storage.sync (il
-  // connaît le nom d'hôte de l'onglet actif sans passer par content.js).
-  // Chaque frame réévalue ici si SON PROPRE location.hostname est concerné —
-  // ce qui couvre aussi les autres onglets ouverts sur le même site.
-  chrome.storage.onChanged.addListener(changes => {
-    if (!changes.excludedSites) return;
-    const list = Array.isArray(changes.excludedSites.newValue) ? changes.excludedSites.newValue : [];
-    const wasExcluded = current.excluded;
-    current.excluded = list.includes(location.hostname);
-    if (current.excluded !== wasExcluded) pushToInject('update');
-  });
+    if (changes.excludedSites) {
+      const list = Array.isArray(changes.excludedSites.newValue) ? changes.excludedSites.newValue : [];
+      const wasExcluded = current.excluded;
+      current.excluded = hostInList(location.hostname, list);
+      if (current.excluded !== wasExcluded) pushToInject('update');
+    }
 
-  // ── Synchronisation profil de site ───────────────────────────────
-  // Même principe que l'exclusion : le popup écrit directement siteProfiles
-  // dans chrome.storage.sync, chaque frame réévalue ici si SON PROPRE
-  // hostname est concerné.
-  chrome.storage.onChanged.addListener(changes => {
-    if (!changes.siteProfiles) return;
-    const profiles = changes.siteProfiles.newValue;
-    const rawProfile = (profiles && typeof profiles === 'object') ? profiles[location.hostname] : null;
-    const next = sanitizeProfile(rawProfile);
-    const changed = JSON.stringify(next) !== JSON.stringify(current.siteOverride);
-    current.siteOverride = next;
-    if (changed) pushToInject('update');
+    if (changes.siteProfiles) {
+      const profiles = changes.siteProfiles.newValue;
+      const rawProfile = (profiles && typeof profiles === 'object') ? findSiteProfile(location.hostname, profiles) : null;
+      const next = sanitizeProfile(rawProfile);
+      const changed = JSON.stringify(next) !== JSON.stringify(current.siteOverride);
+      current.siteOverride = next;
+      if (changed) pushToInject('update');
+    }
   });
 
   // ── Initialisation ──────────────────────────────────────────────
