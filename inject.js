@@ -103,6 +103,18 @@
     return fn;
   }
 
+  // Détecte un vrai statement "debugger;" dans le code source d'une
+  // fonction — pas juste le mot "debugger" n'importe où (ex: un commentaire
+  // "// debugger removed" ne doit pas déclencher un faux positif). On exige
+  // que le mot ne soit pas précédé d'un caractère d'identifiant/point (évite
+  // "myDebugger" ou "obj.debugger") et soit suivi d'un terminateur de
+  // statement plausible (';', retour à la ligne, ou '}').
+  const _DEBUGGER_STMT_RE = /(^|[^.\w$])debugger\s*(;|\r?\n|\})/;
+  function hasDebuggerStatement(fn) {
+    if (typeof fn !== 'function') return false;
+    try { return _DEBUGGER_STMT_RE.test(_origFnToStr.call(fn)); } catch (_) { return false; }
+  }
+
   // ── Token d'authentification postMessage ─────────────────────────
   // Clés booléennes qui déterminent si l'extension est "active"
   const _ACTIVE_KEYS = [
@@ -748,17 +760,25 @@
       }, 'now');
     } catch (_) {}
 
-    // V5 — setInterval/setTimeout : bloquer uniquement les callbacks string
-    // contenant "debugger". On NE throttle plus les callbacks function car cela
-    // casse les animations et timers légitimes à haute fréquence.
+    // V5 — setInterval/setTimeout : bloquer les callbacks contenant un vrai
+    // statement "debugger" — string (comme avant) OU fonction. C'est la
+    // technique la plus répandue en pratique (utilisée par des libs comme
+    // "disable-devtool") : un timer mesure le temps de pause autour d'un
+    // "debugger;" pour détecter DevTools. Jitter de performance.now() (V4)
+    // n'y change rien puisque la pause elle-même est un vrai délai physique
+    // — il faut empêcher le "debugger;" de s'exécuter, pas fausser sa
+    // mesure. On NE throttle plus les callbacks function légitimes (sans
+    // debugger) car cela cassait les animations et timers à haute fréquence.
     try {
       window.setInterval = nativeToStr(function setInterval(fn, ms, ...a) {
         if (typeof fn === 'string' && /debugger|devtools/i.test(fn)) return 0;
+        if (typeof fn === 'function' && hasDebuggerStatement(fn)) return 0;
         if (typeof fn === 'string') return N.sI(fn, Math.max(Number(ms) || 0, 50), ...a);
         return N.sI(fn, ms, ...a);
       }, 'setInterval');
       window.setTimeout = nativeToStr(function setTimeout(fn, ms, ...a) {
         if (typeof fn === 'string' && /debugger|devtools/i.test(fn)) return 0;
+        if (typeof fn === 'function' && hasDebuggerStatement(fn)) return 0;
         return N.sT(fn, ms, ...a);
       }, 'setTimeout');
     } catch (_) {}
