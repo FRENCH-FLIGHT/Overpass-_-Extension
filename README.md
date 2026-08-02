@@ -101,6 +101,7 @@ Users are responsible for complying with the terms of service of websites they v
 
 ### v3.7.0 — Current
 - **New** — Excluding a site or saving a site profile now also accepts a whole domain (e.g. `*.example.com`) to cover all its subdomains at once, addable directly from Settings
+- **Improved** — DevTools Protection now catches a widely-used detection method it was missing before, making it noticeably more effective
 - **Fixed** — Turning off DevTools Protection now fully reverts it, instead of leaving some of it active until the page is reloaded
 - **Fixed** — Reduced the chance of the DevTools Protection interfering with unrelated site behaviour
 - **Improved** — Auto-hiding of popups now also catches ones that appear a few seconds after the page loads, not just ones present immediately
