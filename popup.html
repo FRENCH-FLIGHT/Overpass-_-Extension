@@ -20,7 +20,7 @@
     </div>
     <div>
       <div class="logo-name">Overpass</div>
-      <div class="logo-sub" id="versionLabel"><span id="versionText">v3.6.4</span><span class="update-dot" id="updateDot" style="display:none" data-i18n-title="updateDotTitle" title="Mise à jour disponible"></span></div>
+      <div class="logo-sub" id="versionLabel"><span id="versionText">v4.0.0</span><span class="update-dot" id="updateDot" style="display:none" data-i18n-title="updateDotTitle" title="Mise à jour disponible"></span></div>
     </div>
   </div>
   <div class="header-right">
@@ -92,10 +92,21 @@
 <!-- ══ PANEL: PROTECTIONS ══════════════════════════════════════ -->
 <div class="panel active" id="panel-protections">
 
+  <!-- Suggestion basée sur le contenu détecté de la page (jamais appliquée automatiquement) -->
+  <div class="preset-hint" id="presetHint" style="display:none">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 16v-4M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span class="preset-hint-text" id="presetHintText"></span>
+    <button class="pill-btn btn-green preset-hint-btn" id="btnApplyHint" data-i18n="hintApply">Essayer</button>
+    <button class="icon-btn-sm" id="btnDismissHint" data-i18n-title="hintDismiss" title="Ignorer la suggestion">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
   <!-- Préréglages rapides -->
   <div class="presets-row">
     <span class="presets-label" data-i18n="presetsLabel">Préréglages :</span>
     <button class="pill-btn btn-ghost preset-btn" id="presetReading" data-i18n="presetReading" data-i18n-title="presetReadingDesc" title="Optimisé pour la lecture d'articles et le contournement de paywalls">Lecture</button>
+    <button class="pill-btn btn-ghost preset-btn" id="presetVideo" data-i18n="presetVideo" data-i18n-title="presetVideoDesc" title="Pensé pour le streaming">Vidéo</button>
     <button class="pill-btn btn-ghost preset-btn" id="presetStealth" data-i18n="presetStealth" data-i18n-title="presetStealthDesc" title="Empreinte minimale : protège la confidentialité sans modifier le comportement du site">Furtif</button>
     <button class="pill-btn btn-ghost preset-btn" id="presetBalanced" data-i18n="presetBalanced" data-i18n-title="presetBalancedDesc" title="Réglages recommandés par défaut">Équilibré</button>
   </div>
@@ -184,7 +195,7 @@
     <div class="group-header">
       <span class="group-icon">📜</span>
       <span class="group-title" data-i18n="groupBehavior">Comportement de page</span>
-      <span class="group-count" id="cnt-behavior">0/5</span>
+      <span class="group-count" id="cnt-behavior">0/6</span>
       <label class="toggle toggle-sm">
         <input type="checkbox" data-group-toggle="behavior"/>
         <span class="slider"></span>
@@ -225,6 +236,35 @@
           <div class="feature-desc" data-i18n="dOverlays">Détecte et masque automatiquement les grandes fenêtres bloquantes</div>
         </div>
         <label class="toggle"><input type="checkbox" data-key="overlays"/><span class="slider"></span></label>
+      </div>
+      <div class="feature-row">
+        <div class="feature-info">
+          <div class="feature-name" data-i18n="fZoom">Zoom</div>
+          <div class="feature-desc" data-i18n="dZoom">Débloque le pinch-to-zoom quand un site le désactive</div>
+        </div>
+        <label class="toggle"><input type="checkbox" data-key="zoom"/><span class="slider"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Affichage -->
+  <div class="group">
+    <div class="group-header">
+      <span class="group-icon">🌓</span>
+      <span class="group-title" data-i18n="groupDisplay">Affichage</span>
+      <span class="group-count" id="cnt-display">0/1</span>
+      <label class="toggle toggle-sm">
+        <input type="checkbox" data-group-toggle="display"/>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="group-body">
+      <div class="feature-row">
+        <div class="feature-info">
+          <div class="feature-name" data-i18n="fDarkMode">Mode sombre forcé</div>
+          <div class="feature-desc" data-i18n="dDarkMode">Applique un thème sombre à n'importe quel site, même sans support natif</div>
+        </div>
+        <label class="toggle"><input type="checkbox" data-key="darkMode"/><span class="slider"></span></label>
       </div>
     </div>
   </div>
@@ -387,6 +427,10 @@
   <div class="settings-section">
     <div class="settings-label" data-i18n="settingExcluded">Sites exclus</div>
     <p class="settings-desc" data-i18n="settingExcludedDesc">Désactivez Overpass sur un site via le bandeau en haut du popup ; il apparaîtra ici.</p>
+    <div class="excluded-add-row">
+      <input type="text" class="excluded-add-input" id="excludedAddInput" data-i18n-placeholder="excludedAddPlaceholder" placeholder="exemple.com ou *.exemple.com" autocomplete="off" spellcheck="false"/>
+      <button class="pill-btn btn-green" id="btnAddExcluded" data-i18n="addSite">Ajouter</button>
+    </div>
     <div class="excluded-list" id="excludedList"></div>
     <p class="empty-sub" id="excludedEmpty" data-i18n="excludedEmptyMsg">Aucun site exclu.</p>
   </div>
@@ -418,6 +462,15 @@
   </div>
 
   <div class="settings-section">
+    <div class="settings-label" data-i18n="settingNetworkBlocking">Blocage réseau</div>
+    <p class="settings-desc" data-i18n="settingNetworkBlockingDesc">Bloque, au niveau réseau, une liste de scripts connus servant uniquement à détecter et contrer les bloqueurs de contenu. Liste de départ, à faire grandir avec le temps.</p>
+    <div class="settings-row" style="align-items:center;justify-content:space-between">
+      <span class="feature-name" data-i18n="networkBlockingToggle">Activer le blocage</span>
+      <label class="toggle"><input type="checkbox" id="networkBlockingToggle"/><span class="slider"></span></label>
+    </div>
+  </div>
+
+  <div class="settings-section">
     <div class="settings-label danger-label" data-i18n="settingFactory">Réinitialisation</div>
     <p class="settings-desc" data-i18n="settingFactoryDesc">Remet tout à zéro et supprime vos scripts personnalisés.</p>
     <button class="pill-btn btn-red-ghost" id="btnFactoryReset" data-i18n="factoryReset">Restaurer les paramètres usine</button>
@@ -426,7 +479,7 @@
   <div class="settings-section">
     <div class="settings-label" data-i18n="settingAbout">À propos</div>
     <div class="about-card">
-      <div class="about-row"><span class="about-key">Version</span><span class="about-val mono" id="aboutVersion">3.6.4</span></div>
+      <div class="about-row"><span class="about-key">Version</span><span class="about-val mono" id="aboutVersion">4.0.0</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutEngine">Moteur</span><span class="about-val mono">MV3 · MAIN world · L1–L9</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutCompat">Compatibilité</span><span class="about-val mono">Chrome 111+ · Edge 111+</span></div>
       <div class="about-row"><span class="about-key" data-i18n="aboutShortcuts">Raccourcis</span><span class="about-val mono" id="shortcutsLink" data-i18n-title="aboutShortcutsTitle" style="cursor:pointer;text-decoration:underline dotted">chrome://extensions/shortcuts</span></div>
