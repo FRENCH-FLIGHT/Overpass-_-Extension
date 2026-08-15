@@ -1,5 +1,5 @@
 /**
- * Overpass v3.6.4 – report.js
+ * Overpass v4.0.1 – report.js
  *
  * Page de signalement en onglet complet, indépendante du popup.
  * Aucune donnée n'est envoyée automatiquement : l'utilisateur complète,
@@ -13,7 +13,7 @@ const FACTORY_DEFAULTS = {
   contextmenu: true,  selectstart: true,  clipboard: true,  keyboard: true,
   dragdrop: true,     scroll: false,      cursor: true,     pointerEvents: false,
   print: true,        overlays: false,    devtools: false,  consoleProtect: false,
-  focus: false,       visibility: true,
+  focus: false,       visibility: true,   zoom: true,        darkMode: false,
 };
 
 const LOCALE_MAP = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', de: 'de-DE' };
@@ -171,16 +171,50 @@ async function listOpenHostnames() {
   }
 }
 
+// Même sémantique que hostMatchesPattern() côté content.js/background.js :
+// "exemple.com" (exact) ou "*.exemple.com" (domaine + sous-domaines).
+function hostMatchesPattern(host, pattern) {
+  if (!host || typeof pattern !== 'string') return false;
+  const p = pattern.trim().toLowerCase();
+  if (!p) return false;
+  const h = host.toLowerCase();
+  if (p.startsWith('*.')) {
+    const base = p.slice(2);
+    return !!base && (h === base || h.endsWith('.' + base));
+  }
+  return h === p;
+}
+
+function hostInList(host, list) {
+  return Array.isArray(list) && list.some(entry => hostMatchesPattern(host, entry));
+}
+
+function findSiteProfile(host, profiles) {
+  if (!host || !profiles || typeof profiles !== 'object') return null;
+  if (profiles[host]) return profiles[host];
+  let best = null, bestLen = -1;
+  Object.keys(profiles).forEach(key => {
+    const p = key.trim().toLowerCase();
+    if (!p.startsWith('*.')) return;
+    const base = p.slice(2);
+    if (base && hostMatchesPattern(host, key) && base.length > bestLen) {
+      best = profiles[key];
+      bestLen = base.length;
+    }
+  });
+  return best;
+}
+
 // Même sémantique que getEffectiveSiteConfig() côté popup.js et
 // effectivePayload() côté content.js : exclusion > profil > réglage global.
 function getEffectiveSiteConfig(hostname, cfg, excludedSites, siteProfiles) {
   if (!hostname) return { ...cfg };
-  if (excludedSites.includes(hostname)) {
+  if (hostInList(hostname, excludedSites)) {
     const off = {};
     Object.keys(FACTORY_DEFAULTS).forEach(k => { off[k] = false; });
     return off;
   }
-  const profile = siteProfiles[hostname];
+  const profile = findSiteProfile(hostname, siteProfiles);
   return profile ? { ...cfg, ...profile } : { ...cfg };
 }
 
@@ -314,8 +348,8 @@ async function init() {
     return {
       date: dateStr, version: manifestVersion, browser: browserName, browserVersion, os, lang,
       hostname: host,
-      excluded: host ? safeExcluded.includes(host) : false,
-      hasProfile: host ? !!safeProfiles[host] : false,
+      excluded: host ? hostInList(host, safeExcluded) : false,
+      hasProfile: host ? !!findSiteProfile(host, safeProfiles) : false,
       toggleDetails: formatToggleDetails(effective),
     };
   }
