@@ -2,17 +2,26 @@
   "manifest_version": 3,
   "name": "Overpass: Page Freedom",
   "short_name": "Overpass",
-  "version": "3.6.4",
+  "version": "4.0.1",
   "description": "Take back control of any web page \u2014 right-click, text selection, clipboard, keyboard shortcuts, overlays, and more.",
   "permissions": [
     "storage",
     "activeTab",
-    "scripting",
-    "tabs"
+    "tabs",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "antiadblock",
+        "enabled": false,
+        "path": "rules/antiadblock.json"
+      }
+    ]
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Overpass",
@@ -58,16 +67,6 @@
       "description": "Activer/désactiver Overpass sur ce site"
     }
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "icons/*.png"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
-  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
