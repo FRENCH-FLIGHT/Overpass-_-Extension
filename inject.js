@@ -1,5 +1,5 @@
 /**
- * Overpass v3.6.4 – inject.js  (world:"MAIN", run_at:"document_start")
+ * Overpass v4.0.1 – inject.js  (world:"MAIN", run_at:"document_start")
  *
  * COUCHES DE BYPASS :
  *  L1  Event.prototype override        ← le plus profond, touche tout
@@ -28,6 +28,14 @@
       value: true, writable: false, enumerable: false, configurable: false,
     });
   } catch (_) { return; }
+
+  // Marqueur aléatoire (par chargement de page) utilisé uniquement pour
+  // booster la spécificité CSS via des sélecteurs #id inexistants (voir
+  // buildCSS ci-dessous) — n'importe quelle chaîne fonctionne identiquement
+  // puisque l'ID ne correspond jamais à un élément réel, mais une valeur
+  // fixe serait une signature statique reconnaissable dans
+  // document.styleSheets, identique pour toute installation de l'extension.
+  const _specGuard = 'g' + Math.random().toString(36).slice(2, 9);
 
   // ════════════════════════════════════════════════════════════════
   // REFS NATIVES — capturées avant tout script de la page
@@ -103,12 +111,24 @@
     return fn;
   }
 
+  // Détecte un vrai statement "debugger;" dans le code source d'une
+  // fonction — pas juste le mot "debugger" n'importe où (ex: un commentaire
+  // "// debugger removed" ne doit pas déclencher un faux positif). On exige
+  // que le mot ne soit pas précédé d'un caractère d'identifiant/point (évite
+  // "myDebugger" ou "obj.debugger") et soit suivi d'un terminateur de
+  // statement plausible (';', retour à la ligne, ou '}').
+  const _DEBUGGER_STMT_RE = /(^|[^.\w$])debugger\s*(;|\r?\n|\})/;
+  function hasDebuggerStatement(fn) {
+    if (typeof fn !== 'function') return false;
+    try { return _DEBUGGER_STMT_RE.test(_origFnToStr.call(fn)); } catch (_) { return false; }
+  }
+
   // ── Token d'authentification postMessage ─────────────────────────
   // Clés booléennes qui déterminent si l'extension est "active"
   const _ACTIVE_KEYS = [
     'contextmenu','selectstart','clipboard','keyboard','dragdrop','scroll',
     'cursor','pointerEvents','print','overlays','devtools','consoleProtect',
-    'focus','visibility',
+    'focus','visibility','zoom','darkMode',
   ];
   function anyActive() {
     return _ACTIVE_KEYS.some(k => S[k]);
@@ -120,7 +140,7 @@
   const ALLOWED_KEYS = new Set([
     'contextmenu','selectstart','clipboard','keyboard','dragdrop',
     'scroll','cursor','pointerEvents','print','overlays','devtools',
-    'consoleProtect','focus','visibility','customScripts','lang',
+    'consoleProtect','focus','visibility','zoom','darkMode','customScripts','lang',
   ]);
 
   // Taille max du payload postMessage : 64 Ko.
@@ -152,6 +172,8 @@
     consoleProtect : false,
     focus          : false,
     visibility     : true,
+    zoom           : true,
+    darkMode       : false,
     customScripts  : [],
     lang           : 'fr',
   };
@@ -448,13 +470,16 @@
     }
     if (S.print) {
       r.push(
-        // :not(#__op_x__) répété booste la spécificité (chaque :not() hérite
-        // de la spécificité de son argument — ici un ID inexistant, donc sans
+        // :not(#xxx) répété booste la spécificité (chaque :not() hérite de
+        // la spécificité de son argument — ici un ID inexistant, donc sans
         // effet sur la sélection réelle) sans quoi cette règle, avec un
         // sélecteur universel, perdrait face à quasi toute règle du site
-        // utilisant une classe/ID, même toutes deux en !important.
+        // utilisant une classe/ID, même toutes deux en !important. L'ID
+        // change à chaque chargement de page (_specGuard) plutôt que d'être
+        // une chaîne fixe, pour ne pas laisser une signature statique
+        // identique sur toutes les installations dans document.styleSheets.
         `@media print{` +
-        `html:not(#__op_a__) body:not(#__op_b__) *:not(#__op_c__)` +
+        `html:not(#${_specGuard}a) body:not(#${_specGuard}b) *:not(#${_specGuard}c)` +
         `{display:revert!important;visibility:visible!important;overflow:visible!important;height:auto!important}}`
       );
     }
@@ -464,6 +489,29 @@
         `[class*="paywall"],[id*="overlay"],[id*="paywall"],` +
         `[class*="cookie-"],[id*="cookie-"],[class*="gdpr"],[id*="gdpr"]` +
         `{pointer-events:none!important;opacity:0!important}`
+      );
+    }
+    if (S.overlays) {
+      r.push(
+        // Certains paywalls ne masquent pas le texte derrière un overlay
+        // mais le tronquent visuellement via -webkit-line-clamp ("Lire la
+        // suite pour vous abonner"). Cette propriété n'a aucun autre usage
+        // que la troncature de texte — la neutraliser partout ne risque
+        // donc de casser aucune mise en page légitime.
+        `*{-webkit-line-clamp:unset!important;line-clamp:unset!important}`
+      );
+    }
+    if (S.darkMode) {
+      r.push(
+        // Inversion globale + double-inversion des médias (image, vidéo…)
+        // pour qu'ils gardent leurs couleurs d'origine — technique standard
+        // reprise par la plupart des extensions "dark mode partout".
+        // Limite connue et acceptée : les éléments position:fixed peuvent
+        // se comporter différemment une fois le html filtré (effet de bord
+        // du CSS filter, pas propre à cette implémentation).
+        `html{filter:invert(1) hue-rotate(180deg)!important;background:#fff!important}`,
+        `img,video,picture,canvas,iframe,svg,[style*="background-image"]` +
+        `{filter:invert(1) hue-rotate(180deg)!important}`
       );
     }
     return r.join('\n');
@@ -731,24 +779,42 @@
     } catch (_) {}
 
     // V4 — performance.now() jitter anti-timing
+    // Le décalage doit rester monotone : "floor" d'une fonction croissante
+    // reste croissant, donc on ne peut jamais renvoyer une valeur inférieure
+    // à l'appel précédent (contrairement à un offset recalculé à chaque
+    // appel, qui pouvait faire "reculer" le temps et casser des libs
+    // d'animation/vidéo qui supposent performance.now() strictement
+    // croissante). L'offset aléatoire est fixé une fois par chargement de
+    // page — assez pour perturber un fingerprint de timing, sans jamais
+    // désynchroniser deux appels consécutifs.
     try {
       const _pn = N.perfNow;
+      const _bucket = 0.05;
+      const _offset = Math.random() * _bucket;
       performance.now = nativeToStr(function now() {
-        return _pn() - ((_pn() * 0.001) % 0.05);
+        return Math.floor((_pn() + _offset) / _bucket) * _bucket;
       }, 'now');
     } catch (_) {}
 
-    // V5 — setInterval/setTimeout : bloquer uniquement les callbacks string
-    // contenant "debugger". On NE throttle plus les callbacks function car cela
-    // casse les animations et timers légitimes à haute fréquence.
+    // V5 — setInterval/setTimeout : bloquer les callbacks contenant un vrai
+    // statement "debugger" — string (comme avant) OU fonction. C'est la
+    // technique la plus répandue en pratique (utilisée par des libs comme
+    // "disable-devtool") : un timer mesure le temps de pause autour d'un
+    // "debugger;" pour détecter DevTools. Jitter de performance.now() (V4)
+    // n'y change rien puisque la pause elle-même est un vrai délai physique
+    // — il faut empêcher le "debugger;" de s'exécuter, pas fausser sa
+    // mesure. On NE throttle plus les callbacks function légitimes (sans
+    // debugger) car cela cassait les animations et timers à haute fréquence.
     try {
       window.setInterval = nativeToStr(function setInterval(fn, ms, ...a) {
         if (typeof fn === 'string' && /debugger|devtools/i.test(fn)) return 0;
+        if (typeof fn === 'function' && hasDebuggerStatement(fn)) return 0;
         if (typeof fn === 'string') return N.sI(fn, Math.max(Number(ms) || 0, 50), ...a);
         return N.sI(fn, ms, ...a);
       }, 'setInterval');
       window.setTimeout = nativeToStr(function setTimeout(fn, ms, ...a) {
         if (typeof fn === 'string' && /debugger|devtools/i.test(fn)) return 0;
+        if (typeof fn === 'function' && hasDebuggerStatement(fn)) return 0;
         return N.sT(fn, ms, ...a);
       }, 'setTimeout');
     } catch (_) {}
@@ -764,17 +830,29 @@
     } catch (_) {}
 
     // V7 — Proxy : neutralise la détection via console.id getter
+    // Portée volontairement restreinte : seuls les Proxy visant directement
+    // `console` sont concernés (seul vecteur de détection connu — un getter
+    // sur "id" que les DevTools déclenchent en formatant l'objet). Avant,
+    // TOUT `new Proxy(...)` de la page passait par ce patch et son handler
+    // d'origine était muté en place, ce qui pouvait planter sur un handler
+    // gelé (Object.freeze) et ajoutait un coût inutile à des libs comme
+    // Vue/MobX/Immer qui utilisent Proxy intensément sans rapport avec
+    // console. On construit maintenant un handler séparé, sans toucher à
+    // celui fourni par la page.
     try {
       const _P = _devOrigs.Proxy;
       window.Proxy = new _P(_P, {
         construct(target, args) {
           const [obj, handler] = args;
-          if (handler && typeof handler.get === 'function') {
-            const orig = handler.get.bind(handler);
-            handler.get = function (o2, prop, recv) {
-              if (prop === 'id' && o2 === console) return 1;
-              return orig(o2, prop, recv);
-            };
+          if (obj === console && handler && typeof handler.get === 'function') {
+            const origGet = handler.get;
+            const safeHandler = Object.assign({}, handler, {
+              get(o2, prop, recv) {
+                if (prop === 'id' && o2 === console) return 1;
+                return origGet.call(handler, o2, prop, recv);
+              },
+            });
+            return new target(obj, safeHandler);
           }
           return new target(obj, handler);
         },
@@ -955,7 +1033,7 @@
   function _sendOverlayList() {
     _pruneDisconnectedOverlays();
     const list = [..._overlays.entries()].map(([id, { desc, auto, ts }]) => ({ id, desc, auto, ts }));
-    N.PM({ __ch: BUS_OUT, action: 'overlayList', payload: list }, '*');
+    N.PM({ __ch: currentBusOut(), action: R_OVERLAY_LIST, payload: list }, '*');
   }
 
   // Mots-clés fréquents des overlays de consentement/paywall/abonnement,
@@ -967,6 +1045,30 @@
     '[class*="popup"],[id*="popup"],[class*="subscribe"],[id*="subscribe"]';
 
   const OVERLAY_INTERACTIVE_SEL = 'nav,video,iframe,canvas,form,input,textarea,select,button[type="submit"]';
+
+  // Détection légère du type de contenu — sert uniquement à SUGGÉRER un
+  // préréglage dans le popup (jamais appliqué automatiquement, l'utilisateur
+  // garde toujours la main). Volontairement peu coûteuse : appelée seulement
+  // à l'ouverture du popup (via 'getState'), jamais en continu, et évite les
+  // opérations qui forcent un reflow global (pas de innerText sur tout le
+  // document — on se contente de textContent, moins cher).
+  function detectContentType() {
+    try {
+      const videos = document.querySelectorAll('video');
+      for (const v of videos) {
+        const r = v.getBoundingClientRect();
+        if (r.width > window.innerWidth * 0.3 && r.height > window.innerHeight * 0.3) return 'video';
+      }
+      const hasPaywallSignal = !!document.querySelector(OVERLAY_KEYWORD_SEL);
+      let textScore = 0;
+      document.querySelectorAll('p').forEach(p => {
+        const len = (p.textContent || '').length;
+        if (len > 40) textScore += len;
+      });
+      if (hasPaywallSignal || textScore > 1200) return 'reading';
+      return null;
+    } catch (_) { return null; }
+  }
 
   function autoRemoveOverlays() {
     if (!S.overlays) return;
@@ -1077,7 +1179,7 @@
     N.REL.call(document, 'mousemove', _mvPicker, true);
     N.REL.call(document, 'click',     _clPicker, true);
     N.REL.call(document, 'keydown',   _kyPicker, true);
-    N.PM({ __ch: BUS_OUT, action: done ? 'pickerDone' : 'pickerCancelled' }, '*');
+    N.PM({ __ch: currentBusOut(), action: done ? R_PICK_DONE : R_PICK_CANCEL }, '*');
   }
 
   function _mvPicker(e) {
@@ -1406,6 +1508,59 @@
   }
 
   // ════════════════════════════════════════════════════════════════
+  // patchViewport — débloque le zoom (pinch-to-zoom) quand un site le
+  // désactive via <meta name="viewport" content="user-scalable=no">
+  // ou un maximum-scale trop restrictif. Problème d'accessibilité courant
+  // (zoom nécessaire pour beaucoup d'utilisateurs), pas seulement un
+  // contournement de restriction commerciale.
+  //
+  // Un balayage périodique léger (2s, tant que S.zoom est actif) réapplique
+  // le correctif si le site retente de verrouiller le viewport après coup
+  // (resize handler, etc.) — plus simple et moins coûteux qu'observer les
+  // mutations d'attribut sur cette balise précise.
+  // ════════════════════════════════════════════════════════════════
+  let _origViewportContent = null;
+  let _viewportEl          = null;
+  let _zoomSweepInterval   = null;
+
+  function patchViewport() {
+    try {
+      const meta = document.querySelector('meta[name="viewport"]');
+      if (!meta) return;
+      if (_origViewportContent === null) {
+        _origViewportContent = meta.getAttribute('content');
+        _viewportEl = meta;
+      }
+      const content = meta.getAttribute('content') || '';
+      if (!/user-scalable\s*=\s*no/i.test(content) && !/maximum-scale\s*=\s*[0-4](\.\d+)?(?!\d)/i.test(content)) return;
+      const fixed = content
+        .replace(/user-scalable\s*=\s*no/gi, 'user-scalable=yes')
+        .replace(/maximum-scale\s*=\s*[0-9.]+/gi, 'maximum-scale=5');
+      if (fixed !== content) meta.setAttribute('content', fixed);
+    } catch (_) {}
+  }
+
+  function _restoreViewport() {
+    if (_viewportEl && _origViewportContent !== null) {
+      try { _viewportEl.setAttribute('content', _origViewportContent); } catch (_) {}
+    }
+    _origViewportContent = null;
+    _viewportEl = null;
+  }
+
+  function _manageZoomSweep() {
+    if (S.zoom) {
+      if (_zoomSweepInterval) return;
+      patchViewport();
+      _zoomSweepInterval = N.sI(patchViewport, 2000);
+    } else if (_zoomSweepInterval) {
+      clearInterval(_zoomSweepInterval);
+      _zoomSweepInterval = null;
+      _restoreViewport();
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
   // teardown — nettoyage complet quand toutes les features sont off.
   // Retire toutes les traces de l'extension du document :
   //   • L4 sentinels retirés du DOM
@@ -1645,6 +1800,8 @@
     }
     _restoreDevtools();
     if (_overlaySweepInterval) { clearInterval(_overlaySweepInterval); _overlaySweepInterval = null; }
+    if (_zoomSweepInterval) { clearInterval(_zoomSweepInterval); _zoomSweepInterval = null; }
+    _restoreViewport();
     _insertRuleActive  = false;
     _setPropActive     = false;
     _adoptedActive     = false;
@@ -1680,6 +1837,7 @@
     patchClipboardContent();
     patchShadowDOM();
     patchDevtools();
+    _manageZoomSweep();
     if (S.overlays)  _idle(autoRemoveOverlays);
     _manageOverlaySweep();
     if (phase)       runScripts(phase);
@@ -1687,17 +1845,51 @@
 
   // ════════════════════════════════════════════════════════════════
   // SECURE MESSAGE BUS
-  // ════════════════════════════════════════════════════════════════
-  const BUS_IN  = '__wm0__';
-  const BUS_OUT = '__wm1__';
+  //
+  // BUS_IN_FIXED/BUS_OUT_FIXED sont identiques pour TOUTE installation de
+  // l'extension — un site pourrait donc les détecter de façon fiable et
+  // permanente avec un simple `window.addEventListener('message', ...)`
+  // qui vérifie `e.data.__ch`, sans même avoir besoin de casser le token.
+  //
+  // Pour limiter cette empreinte : content.js transmet, dans son tout
+  // premier message authentifié, une clé de session propre à cette
+  // installation (dérivée d'un secret régénéré à chaque démarrage du
+  // navigateur, lu depuis chrome.storage.local — inaccessible à ce monde
+  // MAIN). À partir de là, tout le trafic normal (chaque bascule de
+  // réglage, chaque action sur les overlays, chaque requête d'état) migre
+  // vers ce canal propre à l'installation, jamais partagé entre
+  // utilisateurs. Le canal fixe n'est plus utilisé qu'une seule fois, au
+  // tout début — avant que le moindre script de la page n'ait pu
+  // s'exécuter (garantie "document_start" de Chrome).
+  //
+  // Sécurité inchangée : c'est le token, pas le nom du canal, qui autorise
+  // ou rejette un message. Le canal fixe RESTE accepté indéfiniment en
+  // secours (jamais désactivé) : si la bascule échoue pour une raison
+  // quelconque (storage indisponible, ancienne version en cache, etc.),
+  // tout continue de fonctionner exactement comme avant, sans aucune
+  // régression possible.
+  const BUS_IN_FIXED  = '__wm0__';
+  const BUS_OUT_FIXED = '__wm1__';
+  let BUS_IN_SESSION  = null;
+  let BUS_OUT_SESSION = null;
+
+  function currentBusOut() { return BUS_OUT_SESSION || BUS_OUT_FIXED; }
+
+  // Codes d'action courts — doivent rester strictement identiques aux
+  // valeurs utilisées dans content.js (voir le commentaire là-bas).
+  const A_INIT = 'j1', A_UPDATE = 'j2', A_RM_OVERLAYS = 'j3', A_RS_OVERLAY = 'j4',
+        A_RS_ALL = 'j5', A_PICK_ON = 'j6', A_PICK_OFF = 'j7', A_GET_STATE = 'j8';
+  const R_READY = 'k1', R_OVERLAY_LIST = 'k2', R_STATE = 'k3', R_PICK_DONE = 'k4', R_PICK_CANCEL = 'k5';
 
   N.AEL.call(window, 'message', function (e) {
-    if (!e.data || e.data.__ch !== BUS_IN) return;
-    const { __t: tok, action, payload } = e.data;
+    if (!e.data) return;
+    const ch = e.data.__ch;
+    if (ch !== BUS_IN_FIXED && ch !== BUS_IN_SESSION) return;
+    const { __t: tok, action, payload, __bus } = e.data;
 
     // Authentification token
     if (!_tokenSet) {
-      if (action === 'init' && typeof tok === 'string' && tok.length >= 32) {
+      if (action === A_INIT && typeof tok === 'string' && tok.length >= 32) {
         _authToken = tok;
         _tokenSet  = true;
       } else return;
@@ -1705,10 +1897,20 @@
       if (tok !== _authToken) return;
     }
 
+    // Adoption du canal propre à l'installation, une fois pour toute la
+    // durée de vie de la page — seulement depuis un message déjà
+    // authentifié ci-dessus, et seulement une fois (jamais réassigné par
+    // la suite, pour éviter qu'un message ultérieur ne fasse dévier le
+    // canal en cours de route).
+    if (!BUS_IN_SESSION && typeof __bus === 'string' && /^[a-f0-9]{16,32}$/.test(__bus)) {
+      BUS_IN_SESSION  = '__wm0_' + __bus;
+      BUS_OUT_SESSION = '__wm1_' + __bus;
+    }
+
     switch (action) {
-      case 'init':
-      case 'update': {
-        if (action === 'update' && !validatePayload(payload)) return;
+      case A_INIT:
+      case A_UPDATE: {
+        if (action === A_UPDATE && !validatePayload(payload)) return;
         const safe = {};
         Object.keys(payload || {}).forEach(k => { if (ALLOWED_KEYS.has(k)) safe[k] = payload[k]; });
         // 'customScripts' est toujours présent dans le payload (même vide,
@@ -1723,13 +1925,13 @@
         applyAll('document_idle');
         break;
       }
-      case 'removeOverlays':    autoRemoveOverlays(); break;
-      case 'restoreOverlay':    restoreOverlay(payload?.id); break;
-      case 'restoreAllOverlays': [..._overlays.keys()].forEach(id => restoreOverlay(id)); break;
-      case 'activatePicker':    activatePicker(); break;
-      case 'cancelPicker':      deactivatePicker(false); break;
-      case 'getState':
-        N.PM({ __ch: BUS_OUT, action: 'state', payload: { ...S } }, '*');
+      case A_RM_OVERLAYS: autoRemoveOverlays(); break;
+      case A_RS_OVERLAY:  restoreOverlay(payload?.id); break;
+      case A_RS_ALL:      [..._overlays.keys()].forEach(id => restoreOverlay(id)); break;
+      case A_PICK_ON:     activatePicker(); break;
+      case A_PICK_OFF:    deactivatePicker(false); break;
+      case A_GET_STATE:
+        N.PM({ __ch: currentBusOut(), action: R_STATE, payload: { ...S, contentHint: detectContentType() } }, '*');
         _sendOverlayList();
         break;
     }
@@ -1769,5 +1971,5 @@
     N.sT(() => { runScripts('document_idle'); }, 900);
   }, { once: true });
 
-  N.PM({ __ch: BUS_OUT, action: 'ready' }, '*');
+  N.PM({ __ch: BUS_OUT_FIXED, action: R_READY }, '*');
 })();
