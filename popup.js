@@ -1,5 +1,5 @@
 /**
- * Overpass v3.6.4 – popup.js
+ * Overpass v4.0.1 – popup.js
  *
  * Sécurité :
  * - Aucun innerHTML avec données non échappées (XSS safe)
@@ -19,11 +19,15 @@ const I18N = {
     tabProtections:'Protections', tabOverlays:'Overlays',
     tabScripts:'Scripts', tabSettings:'Paramètres',
     groupMouse:'Souris & Sélection', groupClipboard:'Copier-coller & Clavier',
-    groupBehavior:'Comportement de page', groupAdvanced:'Avancé', groupTools:'Outils rapides',
+    groupBehavior:'Comportement de page', groupDisplay:'Affichage', groupAdvanced:'Avancé', groupTools:'Outils rapides',
     presetsLabel:'Préréglages :',
     presetReading:'Lecture', presetReadingDesc:'Optimisé pour la lecture d\u2019articles et le contournement de paywalls',
     presetStealth:'Furtif', presetStealthDesc:'Empreinte minimale : protège la confidentialité sans modifier le comportement du site',
     presetBalanced:'Équilibré', presetBalancedDesc:'Réglages recommandés par défaut',
+    presetVideo:'Vidéo', presetVideoDesc:'Pensé pour le streaming : lecteur toujours visible, scroll et clics débloqués',
+    hintReadingText:'Cette page ressemble à un article ou un contenu bloqué (paywall)',
+    hintVideoText:'Cette page ressemble à un lecteur vidéo',
+    hintApply:'Essayer', hintDismiss:'Ignorer la suggestion',
     toastPresetApplied: label => `✓ Préréglage "${label}" appliqué`,
     groupToggleAll:'Tout activer/désactiver ce groupe',
     fContextmenu:'Clic droit', dContextmenu:'Réactive le menu qui apparaît avec un clic droit',
@@ -37,6 +41,8 @@ const I18N = {
     fScroll:'Défilement de page', dScroll:'Débloque le scroll quand un site fixe la page',
     fPrint:'Impression', dPrint:"Permet d'imprimer ou sauvegarder en PDF les pages qui l'interdisent",
     fVisibility:'Toujours visible', dVisibility:"Fait croire au site que vous êtes toujours sur cet onglet",
+    fZoom:'Zoom', dZoom:'Débloque le pinch-to-zoom quand un site le désactive',
+    fDarkMode:'Mode sombre forcé', dDarkMode:'Applique un thème sombre à n\u2019importe quel site, même sans support natif',
     fOverlays:'Masquage auto des popups', dOverlays:'Détecte et masque automatiquement les grandes fenêtres bloquantes',
     fDevtools:'Masquer les outils développeur', dDevtools:'Empêche le site de détecter que vous avez ouvert la console F12',
     fConsole:'Protéger la console', dConsole:"Empêche le site d'effacer les messages dans la console",
@@ -68,6 +74,8 @@ const I18N = {
     settingExcluded:'Sites exclus',
     settingExcludedDesc:'Désactivez Overpass sur un site via le bandeau en haut du popup ; il apparaîtra ici.',
     excludedEmptyMsg:'Aucun site exclu.', removeSite:'Retirer',
+    excludedAddPlaceholder:'exemple.com ou *.exemple.com', addSite:'Ajouter',
+    toastSiteAdded:'✓ Site ajouté aux exclusions', toastInvalidSite:'Adresse de site invalide',
     settingProfiles:'Profils de site',
     settingProfilesDesc:"Un site peut avoir sa propre combinaison de protections, différente du réglage global — enregistrez-la via l'icône dans le bandeau en haut du popup.",
     profilesEmptyMsg:'Aucun profil de site enregistré.',
@@ -86,6 +94,10 @@ const I18N = {
     toastExportDone:'✓ Sauvegarde téléchargée', toastImportDone:'✓ Réglages importés', toastImportError:'Fichier invalide ou illisible',
     confirmImportTitle:'Importer cette sauvegarde ?',
     importSummary: (sc, si, sp) => `Cette sauvegarde contient ${sc} script${sc>1?'s':''} personnalisé${sc>1?'s':''}, ${si} site${si>1?'s':''} exclu${si>1?'s':''} et ${sp} profil${sp>1?'s':''} de site. Vos réglages actuels seront remplacés. Continuer ?`,
+    settingNetworkBlocking:'Blocage réseau',
+    settingNetworkBlockingDesc:'Bloque, au niveau réseau, une liste de scripts connus servant uniquement à détecter et contrer les bloqueurs de contenu. Liste de départ, à faire grandir avec le temps.',
+    networkBlockingToggle:'Activer le blocage',
+    toastNetworkBlockingOn:'✓ Blocage réseau activé', toastNetworkBlockingOff:'Blocage réseau désactivé',
     settingSupport:'Support',
     updateUpToDate:'À jour', updateChecking:'Vérification…', updateCheckFailed:'Échec de la vérification',
     toastStorageQuotaExceeded:'⚠ Trop volumineux pour être sauvegardé — réduisez la taille de vos scripts',
@@ -131,11 +143,15 @@ const I18N = {
     tabProtections:'Protections', tabOverlays:'Overlays',
     tabScripts:'Scripts', tabSettings:'Settings',
     groupMouse:'Mouse & Selection', groupClipboard:'Clipboard & Keyboard',
-    groupBehavior:'Page Behavior', groupAdvanced:'Advanced', groupTools:'Quick Tools',
+    groupBehavior:'Page Behavior', groupDisplay:'Display', groupAdvanced:'Advanced', groupTools:'Quick Tools',
     presetsLabel:'Presets:',
     presetReading:'Reading', presetReadingDesc:'Optimized for reading articles and bypassing paywalls',
     presetStealth:'Stealth', presetStealthDesc:'Minimal footprint: protects privacy without changing site behavior',
     presetBalanced:'Balanced', presetBalancedDesc:'Recommended default settings',
+    presetVideo:'Video', presetVideoDesc:'Built for streaming: player stays visible, scroll and clicks unblocked',
+    hintReadingText:'This page looks like an article or blocked content (paywall)',
+    hintVideoText:'This page looks like a video player',
+    hintApply:'Try it', hintDismiss:'Dismiss suggestion',
     toastPresetApplied: label => `✓ "${label}" preset applied`,
     groupToggleAll:'Toggle entire group',
     fContextmenu:'Right-click', dContextmenu:'Re-enables the native context menu',
@@ -149,6 +165,8 @@ const I18N = {
     fScroll:'Page scrolling', dScroll:'Unblocks scroll when a site freezes the page',
     fPrint:'Print', dPrint:'Allows printing or saving as PDF on restricted pages',
     fVisibility:'Always visible', dVisibility:"Makes the site think you're always on this tab",
+    fZoom:'Zoom', dZoom:'Unblocks pinch-to-zoom when a site disables it',
+    fDarkMode:'Forced dark mode', dDarkMode:'Applies a dark theme to any site, even without native support',
     fOverlays:'Auto popup removal', dOverlays:'Detects and hides large blocking windows automatically',
     fDevtools:'Hide developer tools', dDevtools:'Prevents the site from detecting F12 is open',
     fConsole:'Protect console', dConsole:'Prevents the site from clearing console messages',
@@ -180,6 +198,8 @@ const I18N = {
     settingExcluded:'Excluded sites',
     settingExcludedDesc:'Disable Overpass on a site using the banner at the top of the popup; it will appear here.',
     excludedEmptyMsg:'No excluded sites.', removeSite:'Remove',
+    excludedAddPlaceholder:'example.com or *.example.com', addSite:'Add',
+    toastSiteAdded:'✓ Site added to exclusions', toastInvalidSite:'Invalid site address',
     settingProfiles:'Site profiles',
     settingProfilesDesc:'A site can have its own combination of protections, different from the global setting — save it using the icon in the banner at the top of the popup.',
     profilesEmptyMsg:'No site profiles saved.',
@@ -198,6 +218,10 @@ const I18N = {
     toastExportDone:'✓ Backup downloaded', toastImportDone:'✓ Settings imported', toastImportError:'Invalid or unreadable file',
     confirmImportTitle:'Import this backup?',
     importSummary: (sc, si, sp) => `This backup contains ${sc} custom script${sc>1?'s':''}, ${si} excluded site${si>1?'s':''} and ${sp} site profile${sp>1?'s':''}. Your current settings will be replaced. Continue?`,
+    settingNetworkBlocking:'Network blocking',
+    settingNetworkBlockingDesc:'Blocks, at the network level, a list of known scripts whose only purpose is detecting and defeating content blockers. A starter list, meant to grow over time.',
+    networkBlockingToggle:'Enable blocking',
+    toastNetworkBlockingOn:'✓ Network blocking enabled', toastNetworkBlockingOff:'Network blocking disabled',
     settingSupport:'Support',
     updateUpToDate:'Up to date', updateChecking:'Checking…', updateCheckFailed:'Check failed',
     toastStorageQuotaExceeded:'⚠ Too large to save — try reducing the size of your scripts',
@@ -243,11 +267,15 @@ const I18N = {
     tabProtections:'Protecciones', tabOverlays:'Overlays',
     tabScripts:'Scripts', tabSettings:'Ajustes',
     groupMouse:'Ratón y Selección', groupClipboard:'Portapapeles y Teclado',
-    groupBehavior:'Comportamiento', groupAdvanced:'Avanzado', groupTools:'Herramientas',
+    groupBehavior:'Comportamiento', groupDisplay:'Visualización', groupAdvanced:'Avanzado', groupTools:'Herramientas',
     presetsLabel:'Preajustes:',
     presetReading:'Lectura', presetReadingDesc:'Optimizado para leer artículos y evitar paywalls',
     presetStealth:'Sigiloso', presetStealthDesc:'Huella mínima: protege la privacidad sin cambiar el comportamiento del sitio',
     presetBalanced:'Equilibrado', presetBalancedDesc:'Ajustes recomendados por defecto',
+    presetVideo:'Vídeo', presetVideoDesc:'Pensado para streaming: reproductor siempre visible, scroll y clics desbloqueados',
+    hintReadingText:'Esta página parece un artículo o contenido bloqueado (paywall)',
+    hintVideoText:'Esta página parece un reproductor de vídeo',
+    hintApply:'Probar', hintDismiss:'Descartar sugerencia',
     toastPresetApplied: label => `✓ Preajuste "${label}" aplicado`,
     groupToggleAll:'Activar/desactivar todo el grupo',
     fContextmenu:'Clic derecho', dContextmenu:'Reactiva el menú contextual nativo',
@@ -261,6 +289,8 @@ const I18N = {
     fScroll:'Desplazamiento', dScroll:'Desbloquea el scroll cuando un sitio lo congela',
     fPrint:'Impresión', dPrint:'Permite imprimir o guardar como PDF páginas que lo prohíben',
     fVisibility:'Siempre visible', dVisibility:'Hace creer al sitio que siempre estás en esta pestaña',
+    fZoom:'Zoom', dZoom:'Desbloquea el pinch-to-zoom cuando un sitio lo desactiva',
+    fDarkMode:'Modo oscuro forzado', dDarkMode:'Aplica un tema oscuro a cualquier sitio, incluso sin soporte nativo',
     fOverlays:'Eliminar popups auto', dOverlays:'Detecta y oculta automáticamente ventanas bloqueantes',
     fDevtools:'Ocultar dev tools', dDevtools:'Evita que el sitio detecte F12 abierto',
     fConsole:'Proteger consola', dConsole:'Evita que el sitio borre los mensajes de consola',
@@ -292,6 +322,8 @@ const I18N = {
     settingExcluded:'Sitios excluidos',
     settingExcludedDesc:'Desactiva Overpass en un sitio con el banner superior; aparecerá aquí.',
     excludedEmptyMsg:'Sin sitios excluidos.', removeSite:'Quitar',
+    excludedAddPlaceholder:'ejemplo.com o *.ejemplo.com', addSite:'Añadir',
+    toastSiteAdded:'✓ Sitio añadido a las exclusiones', toastInvalidSite:'Dirección de sitio no válida',
     settingProfiles:'Perfiles de sitio',
     settingProfilesDesc:'Un sitio puede tener su propia combinación de protecciones, distinta del ajuste global — guárdala con el icono del banner superior del popup.',
     profilesEmptyMsg:'Sin perfiles de sitio guardados.',
@@ -310,6 +342,10 @@ const I18N = {
     toastExportDone:'✓ Copia descargada', toastImportDone:'✓ Ajustes importados', toastImportError:'Archivo inválido o ilegible',
     confirmImportTitle:'¿Importar esta copia de seguridad?',
     importSummary: (sc, si, sp) => `Esta copia contiene ${sc} script${sc>1?'s':''} personalizado${sc>1?'s':''}, ${si} sitio${si>1?'s':''} excluido${si>1?'s':''} y ${sp} perfil${sp>1?'es':''} de sitio. Tus ajustes actuales serán reemplazados. ¿Continuar?`,
+    settingNetworkBlocking:'Bloqueo de red',
+    settingNetworkBlockingDesc:'Bloquea, a nivel de red, una lista de scripts conocidos cuya única función es detectar y contrarrestar los bloqueadores de contenido. Lista inicial, pensada para crecer con el tiempo.',
+    networkBlockingToggle:'Activar bloqueo',
+    toastNetworkBlockingOn:'✓ Bloqueo de red activado', toastNetworkBlockingOff:'Bloqueo de red desactivado',
     settingSupport:'Soporte',
     updateUpToDate:'Actualizado', updateChecking:'Comprobando…', updateCheckFailed:'Fallo al comprobar',
     toastStorageQuotaExceeded:'⚠ Demasiado grande para guardar — reduce el tamaño de tus scripts',
@@ -355,11 +391,15 @@ const I18N = {
     tabProtections:'Schutz', tabOverlays:'Overlays',
     tabScripts:'Skripte', tabSettings:'Einstellungen',
     groupMouse:'Maus & Auswahl', groupClipboard:'Zwischenablage & Tastatur',
-    groupBehavior:'Seitenverhalten', groupAdvanced:'Erweitert', groupTools:'Schnelltools',
+    groupBehavior:'Seitenverhalten', groupDisplay:'Anzeige', groupAdvanced:'Erweitert', groupTools:'Schnelltools',
     presetsLabel:'Voreinstellungen:',
     presetReading:'Lesen', presetReadingDesc:'Optimiert zum Lesen von Artikeln und Umgehen von Paywalls',
     presetStealth:'Tarnung', presetStealthDesc:'Minimaler Fußabdruck: schützt die Privatsphäre, ohne das Seitenverhalten zu ändern',
     presetBalanced:'Ausgewogen', presetBalancedDesc:'Empfohlene Standardeinstellungen',
+    presetVideo:'Video', presetVideoDesc:'Für Streaming gedacht: Player bleibt sichtbar, Scrollen und Klicks entsperrt',
+    hintReadingText:'Diese Seite sieht nach einem Artikel oder gesperrtem Inhalt (Paywall) aus',
+    hintVideoText:'Diese Seite sieht nach einem Video-Player aus',
+    hintApply:'Ausprobieren', hintDismiss:'Vorschlag ausblenden',
     toastPresetApplied: label => `✓ Voreinstellung „${label}" angewendet`,
     groupToggleAll:'Gesamte Gruppe umschalten',
     fContextmenu:'Rechtsklick', dContextmenu:'Reaktiviert das native Kontextmenü',
@@ -373,6 +413,8 @@ const I18N = {
     fScroll:'Scrollen', dScroll:'Entsperrt Scrollen wenn eine Seite es blockiert',
     fPrint:'Drucken', dPrint:'Ermöglicht Drucken oder PDF-Speicherung',
     fVisibility:'Immer sichtbar', dVisibility:'Lässt die Seite glauben Sie seien immer auf diesem Tab',
+    fZoom:'Zoom', dZoom:'Entsperrt Pinch-to-Zoom wenn eine Seite es deaktiviert',
+    fDarkMode:'Erzwungener Dunkelmodus', dDarkMode:'Wendet ein dunkles Design auf jede Seite an, auch ohne native Unterstützung',
     fOverlays:'Auto-Overlay-Entfernung', dOverlays:'Erkennt und versteckt automatisch blockierende Fenster',
     fDevtools:'DevTools verbergen', dDevtools:'Verhindert dass die Seite F12 erkennt',
     fConsole:'Konsolenschutz', dConsole:'Verhindert dass die Seite Konsolenmeldungen löscht',
@@ -404,6 +446,8 @@ const I18N = {
     settingExcluded:'Ausgeschlossene Seiten',
     settingExcludedDesc:'Deaktiviere Overpass über die Leiste oben im Popup; die Seite erscheint dann hier.',
     excludedEmptyMsg:'Keine ausgeschlossenen Seiten.', removeSite:'Entfernen',
+    excludedAddPlaceholder:'beispiel.de oder *.beispiel.de', addSite:'Hinzufügen',
+    toastSiteAdded:'✓ Seite zu Ausschlüssen hinzugefügt', toastInvalidSite:'Ungültige Seitenadresse',
     settingProfiles:'Seitenprofile',
     settingProfilesDesc:'Eine Seite kann ihre eigene Kombination von Schutzfunktionen haben, abweichend von der globalen Einstellung — speichere sie über das Symbol in der Leiste oben im Popup.',
     profilesEmptyMsg:'Keine Seitenprofile gespeichert.',
@@ -422,6 +466,10 @@ const I18N = {
     toastExportDone:'✓ Sicherung heruntergeladen', toastImportDone:'✓ Einstellungen importiert', toastImportError:'Ungültige oder unlesbare Datei',
     confirmImportTitle:'Diese Sicherung importieren?',
     importSummary: (sc, si, sp) => `Diese Sicherung enthält ${sc} benutzerdefiniertes Skript${sc>1?'e':''}, ${si} ausgeschlossene Seite${si>1?'n':''} und ${sp} Seitenprofil${sp>1?'e':''}. Deine aktuellen Einstellungen werden ersetzt. Fortfahren?`,
+    settingNetworkBlocking:'Netzwerk-Blockierung',
+    settingNetworkBlockingDesc:'Blockiert auf Netzwerkebene eine Liste bekannter Skripte, deren einziger Zweck darin besteht, Inhaltsblocker zu erkennen und auszuhebeln. Eine Startliste, die mit der Zeit wachsen soll.',
+    networkBlockingToggle:'Blockierung aktivieren',
+    toastNetworkBlockingOn:'✓ Netzwerk-Blockierung aktiviert', toastNetworkBlockingOff:'Netzwerk-Blockierung deaktiviert',
     settingSupport:'Support',
     updateUpToDate:'Aktuell', updateChecking:'Wird geprüft…', updateCheckFailed:'Prüfung fehlgeschlagen',
     toastStorageQuotaExceeded:'⚠ Zu groß zum Speichern — verkleinere deine Skripte',
@@ -465,12 +513,13 @@ const I18N = {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const VERSION = '3.6.4';
+const VERSION = '4.0.1';
 
 const FEATURE_GROUPS = {
   mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
   keyboard: ['clipboard','keyboard','focus'],
-  behavior: ['dragdrop','scroll','print','visibility','overlays'],
+  behavior: ['dragdrop','scroll','print','visibility','overlays','zoom'],
+  display : ['darkMode'],
   advanced: ['devtools','consoleProtect'],
 };
 
@@ -478,7 +527,7 @@ const FACTORY_DEFAULTS = {
   contextmenu:true, selectstart:true, clipboard:true, keyboard:true,
   dragdrop:true, scroll:false, cursor:true, pointerEvents:false,
   print:true, overlays:false, devtools:false, consoleProtect:false,
-  focus:false, visibility:true,
+  focus:false, visibility:true, zoom:true, darkMode:false,
 };
 
 // Préréglages rapides : chacun couvre explicitement les mêmes clés que
@@ -489,19 +538,25 @@ const PRESETS = {
     contextmenu:true, selectstart:true, clipboard:true, keyboard:true,
     dragdrop:false, scroll:true, cursor:true, pointerEvents:true,
     print:true, overlays:true, devtools:false, consoleProtect:false,
-    focus:false, visibility:false,
+    focus:false, visibility:false, zoom:true, darkMode:false,
   },
   stealth: {
     contextmenu:false, selectstart:false, clipboard:false, keyboard:false,
     dragdrop:false, scroll:false, cursor:false, pointerEvents:false,
     print:false, overlays:false, devtools:true, consoleProtect:true,
-    focus:false, visibility:true,
+    focus:false, visibility:true, zoom:false, darkMode:false,
   },
   balanced: {
     contextmenu:true, selectstart:true, clipboard:true, keyboard:true,
     dragdrop:true,    scroll:false, cursor:true, pointerEvents:false,
     print:true,  overlays:false, devtools:false, consoleProtect:false,
-    focus:false, visibility:true,
+    focus:false, visibility:true, zoom:true, darkMode:false,
+  },
+  video: {
+    contextmenu:true, selectstart:false, clipboard:false, keyboard:true,
+    dragdrop:false, scroll:true, cursor:true, pointerEvents:true,
+    print:false, overlays:true, devtools:false, consoleProtect:false,
+    focus:false, visibility:true, zoom:true, darkMode:false,
   },
 };
 
@@ -519,6 +574,7 @@ let excludedSites    = [];
 let siteProfiles     = {};
 let currentHostname  = '';
 let updateInfo       = null;
+let hintDismissed     = false; // n'affiche plus la suggestion une fois ignorée, pour cette ouverture du popup
 
 // ════════════════════════════════════════════════════════════════
 // HELPERS
@@ -541,6 +597,41 @@ function getHostname(url) {
   try { return new URL(url).hostname || ''; } catch (_) { return ''; }
 }
 
+// Même sémantique que hostMatchesPattern() côté content.js/background.js :
+// "exemple.com" (exact) ou "*.exemple.com" (domaine + sous-domaines) — les
+// sites exclus et les profils de site supportent tous deux ce motif.
+function hostMatchesPattern(host, pattern) {
+  if (!host || typeof pattern !== 'string') return false;
+  const p = pattern.trim().toLowerCase();
+  if (!p) return false;
+  const h = host.toLowerCase();
+  if (p.startsWith('*.')) {
+    const base = p.slice(2);
+    return !!base && (h === base || h.endsWith('.' + base));
+  }
+  return h === p;
+}
+
+function hostInList(host, list) {
+  return Array.isArray(list) && list.some(entry => hostMatchesPattern(host, entry));
+}
+
+function findSiteProfile(host, profiles) {
+  if (!host || !profiles || typeof profiles !== 'object') return null;
+  if (profiles[host]) return profiles[host];
+  let best = null, bestLen = -1;
+  Object.keys(profiles).forEach(key => {
+    const p = key.trim().toLowerCase();
+    if (!p.startsWith('*.')) return;
+    const base = p.slice(2);
+    if (base && hostMatchesPattern(host, key) && base.length > bestLen) {
+      best = profiles[key];
+      bestLen = base.length;
+    }
+  });
+  return best;
+}
+
 // ════════════════════════════════════════════════════════════════
 // SITE BAR — exclusion d'Overpass sur le site de l'onglet actif
 function updateSiteBar() {
@@ -549,13 +640,13 @@ function updateSiteBar() {
   const domainEl = document.getElementById('siteDomain');
   const saveBtn = document.getElementById('btnSaveSiteProfile');
   if (!bar || !inp || !domainEl || !currentHostname) return;
-  const excluded = excludedSites.includes(currentHostname);
+  const excluded = hostInList(currentHostname, excludedSites);
   inp.checked = !excluded;
   bar.classList.toggle('excluded', excluded);
   domainEl.textContent = currentHostname;
   domainEl.title = currentHostname;
   if (saveBtn) {
-    const hasProfile = !!siteProfiles[currentHostname];
+    const hasProfile = !!findSiteProfile(currentHostname, siteProfiles);
     saveBtn.classList.toggle('has-profile', hasProfile);
     saveBtn.title = t(hasProfile ? 'siteProfileUpdateTitle' : 'siteProfileSaveTitle');
   }
@@ -563,10 +654,16 @@ function updateSiteBar() {
 
 async function setSiteExcluded(excluded) {
   if (!currentHostname) return;
-  excludedSites = excluded
+  // Réactiver le site doit garantir qu'il redevient actif : on retire donc
+  // toute entrée qui le concerne, exacte ou wildcard (ex: une règle
+  // "*.exemple.com" ajoutée depuis les Paramètres). Exclure ajoute
+  // uniquement le hostname exact, sans jamais promouvoir en wildcard.
+  const next = excluded
     ? [...new Set([...excludedSites, currentHostname])]
-    : excludedSites.filter(h => h !== currentHostname);
-  await chrome.storage.sync.set({ excludedSites });
+    : excludedSites.filter(entry => !hostMatchesPattern(currentHostname, entry));
+  const ok = await syncSet({ excludedSites: next });
+  if (!ok) return;
+  excludedSites = next;
   updateSiteBar();
   renderExcludedList();
   toast(t(excluded ? 'toastSiteExcluded' : 'toastSiteIncluded'), excluded ? 'info' : 'ok');
@@ -578,15 +675,17 @@ async function setSiteExcluded(excluded) {
 async function saveSiteProfile() {
   if (!currentHostname) return;
   const existing = siteProfiles[currentHostname];
-  const ok = await showConfirm(
+  const confirmed = await showConfirm(
     existing ? 'confirmUpdateProfileTitle' : 'confirmSaveProfileTitle',
     null, t('confirmProfileMsg', currentHostname)
   );
-  if (!ok) return;
+  if (!confirmed) return;
   const snap = {};
   Object.keys(FACTORY_DEFAULTS).forEach(k => { snap[k] = !!cfg[k]; });
-  siteProfiles = { ...siteProfiles, [currentHostname]: snap };
-  await chrome.storage.sync.set({ siteProfiles });
+  const next = { ...siteProfiles, [currentHostname]: snap };
+  const ok = await syncSet({ siteProfiles: next });
+  if (!ok) return;
+  siteProfiles = next;
   updateSiteBar();
   renderProfilesList();
   toast(t('toastProfileSaved'));
@@ -595,8 +694,9 @@ async function saveSiteProfile() {
 async function removeSiteProfile(host) {
   const next = { ...siteProfiles };
   delete next[host];
+  const ok = await syncSet({ siteProfiles: next });
+  if (!ok) return;
   siteProfiles = next;
-  await chrome.storage.sync.set({ siteProfiles });
   renderProfilesList();
   updateSiteBar();
 }
@@ -667,8 +767,10 @@ function renderExcludedList() {
     btn.title = t('removeSite');
     btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
     btn.addEventListener('click', async () => {
-      excludedSites = excludedSites.filter(h => h !== host);
-      await chrome.storage.sync.set({ excludedSites });
+      const next = excludedSites.filter(h => h !== host);
+      const ok = await syncSet({ excludedSites: next });
+      if (!ok) return;
+      excludedSites = next;
       renderExcludedList();
       updateSiteBar();
     });
@@ -676,6 +778,43 @@ function renderExcludedList() {
     item.appendChild(span);
     item.appendChild(btn);
     container.appendChild(item);
+  });
+}
+
+// Normalise une entrée de site tapée manuellement : accepte un préfixe
+// wildcard "*.", retire protocole/chemin/port collés par erreur — même
+// nettoyage que le champ "Restreindre à un site" des scripts personnalisés,
+// pour que la syntaxe reste cohérente dans toute l'extension.
+function normalizeSitePattern(raw) {
+  let val = (raw || '').trim().toLowerCase();
+  const isWildcard = val.startsWith('*.');
+  let host = isWildcard ? val.slice(2) : val;
+  host = host.replace(/^[a-z]+:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+  return (isWildcard ? `*.${host}` : host);
+}
+
+async function addExcludedSite() {
+  const inp = document.getElementById('excludedAddInput');
+  if (!inp) return;
+  const pattern = normalizeSitePattern(inp.value);
+  const bareHost = pattern.startsWith('*.') ? pattern.slice(2) : pattern;
+  if (!bareHost || !bareHost.includes('.')) { toast(t('toastInvalidSite'), 'err'); return; }
+  if (excludedSites.some(e => e.toLowerCase() === pattern)) { inp.value = ''; return; }
+  const next = [...excludedSites, pattern];
+  const ok = await syncSet({ excludedSites: next });
+  if (!ok) return;
+  excludedSites = next;
+  inp.value = '';
+  renderExcludedList();
+  updateSiteBar();
+  toast(t('toastSiteAdded'));
+}
+
+function initExcludedSitesInput() {
+  const inp = document.getElementById('excludedAddInput');
+  document.getElementById('btnAddExcluded')?.addEventListener('click', addExcludedSite);
+  inp?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addExcludedSite(); }
   });
 }
 
@@ -712,6 +851,24 @@ function showConfirm(titleKey, msgKey, rawMsg = null) {
 // ════════════════════════════════════════════════════════════════
 // SEND TO CONTENT SCRIPT
 // ════════════════════════════════════════════════════════════════
+// Écrit dans chrome.storage.sync et signale honnêtement un dépassement de
+// quota (item >8Ko, ou trop d'écritures/minute) au lieu de laisser
+// l'appelant croire que la sauvegarde a réussi. Retourne true/false pour
+// que l'appelant ne mette à jour son état local qu'après un succès réel —
+// sinon la variable en mémoire du popup se désynchronise silencieusement
+// du storage jusqu'à sa prochaine réouverture.
+async function syncSet(obj) {
+  try {
+    await chrome.storage.sync.set(obj);
+    return true;
+  } catch (err) {
+    if (/quota/i.test(err?.message || '')) {
+      toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+    }
+    return false;
+  }
+}
+
 async function send(action, extra = {}) {
   if (!tabId) return;
   try {
@@ -806,7 +963,7 @@ function updateUI() {
 
   // Compteurs de groupes + bascule groupée (checked = tout actif,
   // indeterminate = partiellement actif)
-  const countMap = { mouse:'cnt-mouse', keyboard:'cnt-keyboard', behavior:'cnt-behavior', advanced:'cnt-advanced' };
+  const countMap = { mouse:'cnt-mouse', keyboard:'cnt-keyboard', behavior:'cnt-behavior', display:'cnt-display', advanced:'cnt-advanced' };
   Object.entries(FEATURE_GROUPS).forEach(([g, keys]) => {
     const el = document.getElementById(countMap[g]);
     const active = keys.filter(k => cfg[k]).length;
@@ -886,7 +1043,7 @@ function initGroupToggles() {
 // ════════════════════════════════════════════════════════════════
 // QUICK PRESETS
 // ════════════════════════════════════════════════════════════════
-const PRESET_IDS = { reading: 'presetReading', stealth: 'presetStealth', balanced: 'presetBalanced' };
+const PRESET_IDS = { reading: 'presetReading', stealth: 'presetStealth', balanced: 'presetBalanced', video: 'presetVideo' };
 
 function initPresets() {
   Object.entries(PRESET_IDS).forEach(([key, id]) => {
@@ -915,6 +1072,47 @@ function updatePresetHighlight() {
   const active = matchingPreset();
   Object.entries(PRESET_IDS).forEach(([key, id]) => {
     document.getElementById(id)?.classList.toggle('active', key === active);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// SUGGESTION DE PRÉRÉGLAGE — basée sur un signal détecté par inject.js
+// (type de contenu de la page), reçu en pièce jointe de la réponse
+// 'getState'. Jamais appliqué automatiquement : uniquement une bannière
+// que l'utilisateur peut appliquer ou ignorer d'un clic, cohérent avec le
+// principe général de l'extension (rien n'est modifié sans action
+// explicite). Recalculée à chaque ouverture du popup, jamais en continu.
+// ════════════════════════════════════════════════════════════════
+const HINT_TO_PRESET = { reading: 'reading', video: 'video' };
+
+function evaluateContentHint(hint) {
+  const banner = document.getElementById('presetHint');
+  if (!banner) return;
+  const presetKey = HINT_TO_PRESET[hint];
+  // Rien à suggérer si : pas de signal, déjà ignoré cette session, site
+  // exclu (aucune protection ne s'applique de toute façon), ou le
+  // préréglage suggéré est déjà celui actif.
+  if (!presetKey || hintDismissed || hostInList(currentHostname, excludedSites) || matchingPreset() === presetKey) {
+    banner.style.display = 'none';
+    return;
+  }
+  const textEl = document.getElementById('presetHintText');
+  if (textEl) textEl.textContent = t(hint === 'video' ? 'hintVideoText' : 'hintReadingText');
+  banner.style.display = 'flex';
+  banner.dataset.presetKey = presetKey;
+}
+
+function initPresetHint() {
+  document.getElementById('btnApplyHint')?.addEventListener('click', () => {
+    const banner = document.getElementById('presetHint');
+    const key = banner?.dataset.presetKey;
+    if (key) applyPreset(key);
+    if (banner) banner.style.display = 'none';
+  });
+  document.getElementById('btnDismissHint')?.addEventListener('click', () => {
+    hintDismissed = true;
+    const banner = document.getElementById('presetHint');
+    if (banner) banner.style.display = 'none';
   });
 }
 
@@ -1238,9 +1436,23 @@ function applyTheme(newTheme) {
 // ════════════════════════════════════════════════════════════════
 // EXPORT / IMPORT — sauvegarde complète des réglages
 // ════════════════════════════════════════════════════════════════
-function exportSettings() {
+async function exportSettings() {
   const settings = {};
   Object.keys(FACTORY_DEFAULTS).forEach(k => { settings[k] = !!cfg[k]; });
+
+  // userDefaults n'est pas gardé dans une variable JS (seulement écrit dans
+  // le storage par "Sauvegarder comme défaut") — on va le chercher au moment
+  // de l'export, sinon une sauvegarde/restauration le perdait silencieusement.
+  let userDefaults = null;
+  try {
+    const stored = await chrome.storage.sync.get({ userDefaults: null });
+    if (stored.userDefaults) {
+      const snap = JSON.parse(stored.userDefaults);
+      const safe = {};
+      Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in snap) safe[k] = !!snap[k]; });
+      userDefaults = safe;
+    }
+  } catch (_) {}
 
   const data = {
     _meta: { app: 'Overpass', version: VERSION, exportedAt: new Date().toISOString() },
@@ -1248,6 +1460,7 @@ function exportSettings() {
     customScripts: cfg.customScripts || [],
     excludedSites,
     siteProfiles,
+    userDefaults,
     language: lang,
     theme,
   };
@@ -1317,10 +1530,21 @@ function parseBackupFile(text) {
   const language = ['fr', 'en', 'es', 'de'].includes(data.language) ? data.language : null;
   const theme    = ['dark', 'light'].includes(data.theme) ? data.theme : null;
 
+  // userDefaults : mêmes clés que "settings", filtrées de la même façon —
+  // ne jamais faire confiance à un fichier externe.
+  let userDefaults = null;
+  if (data.userDefaults && typeof data.userDefaults === 'object' && !Array.isArray(data.userDefaults)) {
+    const safe = {};
+    let any = false;
+    Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in data.userDefaults) { safe[k] = !!data.userDefaults[k]; any = true; } });
+    if (any) userDefaults = safe;
+  }
+
   return {
     settings, customScripts,
     excludedSites: excludedSitesImported,
     siteProfiles: siteProfilesImported,
+    userDefaults,
     language, theme,
   };
 }
@@ -1352,6 +1576,7 @@ async function handleImportFile(file) {
   const toStore = { excludedSites, siteProfiles };
   if (parsed.language) { lang = parsed.language; toStore.language = lang; }
   if (parsed.theme)    { theme = parsed.theme;   toStore.theme    = theme; }
+  if (parsed.userDefaults) toStore.userDefaults = JSON.stringify(parsed.userDefaults);
   let quotaExceeded = false;
   try { await chrome.storage.sync.set(toStore); } catch (err) {
     if (/quota/i.test(err?.message || '')) quotaExceeded = true;
@@ -1468,8 +1693,8 @@ function initSettings() {
   document.getElementById('btnSaveDefaults')?.addEventListener('click', async () => {
     const snap = {};
     Object.keys(FACTORY_DEFAULTS).forEach(k => snap[k] = cfg[k]);
-    await chrome.storage.sync.set({ userDefaults: JSON.stringify(snap) });
-    toast(t('toastDefaultsSaved'));
+    const ok = await syncSet({ userDefaults: JSON.stringify(snap) });
+    if (ok) toast(t('toastDefaultsSaved'));
   });
 
   // Charger défauts
@@ -1507,8 +1732,19 @@ function initSettings() {
     try {
       await chrome.storage.sync.clear();
       await chrome.storage.sync.set({ ...FACTORY_DEFAULTS, customScripts: '[]', language: lang, theme });
-    } catch (_) {}
-    toast(t('toastFactoryDone'));
+      // storage.sync.clear() efface aussi excludedSites/siteProfiles/
+      // userDefaults, mais les variables en mémoire du popup ne le
+      // reflétaient pas : les listes "Sites exclus"/"Profils" restaient
+      // affichées avec l'ancien contenu tant que le popup n'était pas rouvert.
+      excludedSites = [];
+      siteProfiles  = {};
+      renderExcludedList();
+      renderProfilesList();
+      updateSiteBar();
+      toast(t('toastFactoryDone'));
+    } catch (err) {
+      if (/quota/i.test(err?.message || '')) toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+    }
   });
 
   // Raccourcis clavier — copie le chemin plutôt que de tenter une navigation
@@ -1518,6 +1754,16 @@ function initSettings() {
       await navigator.clipboard.writeText('chrome://extensions/shortcuts');
       toast(t('toastShortcutsCopied'));
     } catch (_) {}
+  });
+
+  // Blocage réseau des scripts anti-adblock connus — bascule simple,
+  // background.js réagit au changement de storage pour (dés)activer le
+  // ruleset declarativeNetRequest correspondant.
+  document.getElementById('networkBlockingToggle')?.addEventListener('change', async e => {
+    const enabled = e.target.checked;
+    const ok = await syncSet({ networkBlocking: enabled });
+    if (!ok) { e.target.checked = !enabled; return; }
+    toast(t(enabled ? 'toastNetworkBlockingOn' : 'toastNetworkBlockingOff'), enabled ? 'ok' : 'info');
   });
 
   // Mise à jour et signalement
@@ -1562,6 +1808,15 @@ function initRuntimeMessages() {
         // Pas de toast ici — le picker a déjà été annulé depuis la page
         break;
 
+      case 'state':
+        if (payload && typeof payload === 'object') {
+          // Validation minimale : contentHint doit être une des valeurs
+          // connues ou absent, jamais une chaîne arbitraire injectée.
+          const hint = ['reading', 'video'].includes(payload.contentHint) ? payload.contentHint : null;
+          evaluateContentHint(hint);
+        }
+        break;
+
       case 'resourceList':
         // Non affiché dans le popup (panel flottant dans la page)
         break;
@@ -1580,6 +1835,7 @@ async function loadSettings() {
     theme: 'dark',
     excludedSites: [],
     siteProfiles: {},
+    networkBlocking: false,
   });
   lang  = stored.language || 'fr';
   theme = stored.theme    || 'dark';
@@ -1587,10 +1843,13 @@ async function loadSettings() {
   siteProfiles  = (stored.siteProfiles && typeof stored.siteProfiles === 'object' && !Array.isArray(stored.siteProfiles))
     ? stored.siteProfiles : {};
 
+  const networkBlockingInput = document.getElementById('networkBlockingToggle');
+  if (networkBlockingInput) networkBlockingInput.checked = !!stored.networkBlocking;
+
   let scripts = [];
   try { scripts = JSON.parse(stored.customScripts || '[]'); } catch (_) {}
   // Retirer les clés non-toggle avant de construire cfg pour rester dans ALLOWED_KEYS côté inject.js.
-  const { language: _l, theme: _t, excludedSites: _es, siteProfiles: _sp, customScripts: _cs, ...toggles } = stored;
+  const { language: _l, theme: _t, excludedSites: _es, siteProfiles: _sp, customScripts: _cs, networkBlocking: _nb, ...toggles } = stored;
   cfg = { ...FACTORY_DEFAULTS, ...toggles, customScripts: scripts };
 
   applyTheme(theme);
@@ -1616,12 +1875,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   initToggles();
   initGroupToggles();
   initPresets();
+  initPresetHint();
   initSiteBar();
   initQuickActions();
   initTools();
   initOverlayPanel();
   initScriptEditor();
   initSettings();
+  initExcludedSitesInput();
   initRuntimeMessages();
   await loadSettings();
   loadUpdateInfo();
