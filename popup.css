@@ -1,4 +1,4 @@
-/* ══ Overpass v3.6.4 – popup.css ═══════════════════════════════ */
+/* ══ Overpass v4.0.0 – popup.css ═══════════════════════════════ */
 
 /* ── Dark theme ──────────────────────────────────────────────── */
 .dark {
@@ -174,6 +174,17 @@ body {
 .preset-btn { font-size:11px; padding:4px 10px; }
 .preset-btn.active { background:var(--green-glow); border-color:#22c55e38; color:var(--green); }
 
+/* ── Suggestion de préréglage (détection de contenu) ────────────── */
+.preset-hint {
+  display:flex; align-items:center; gap:7px;
+  background:rgba(167,139,250,.08); border:1px solid rgba(167,139,250,.28);
+  border-radius:var(--rs); padding:7px 9px; margin-bottom:9px;
+}
+.preset-hint svg { color:var(--purple); flex-shrink:0; }
+.preset-hint-text { flex:1; min-width:0; font-size:11px; color:var(--text); line-height:1.35; }
+.preset-hint-btn { font-size:10.5px; padding:4px 9px; flex-shrink:0; }
+.preset-hint .icon-btn-sm { width:20px; height:20px; flex-shrink:0; }
+
 /* ── Groups ──────────────────────────────────────────────────── */
 .group {
   background:var(--surface); border:1px solid var(--border);
@@ -255,6 +266,14 @@ body {
 .site-save-btn.has-profile { color:var(--green); border-color:#22c55e48; background:var(--green-glow); }
 
 /* ── Excluded sites list (Settings) ─────────────────────────────── */
+.excluded-add-row { display:flex; gap:6px; margin-bottom:8px; }
+.excluded-add-input {
+  flex:1; min-width:0; background:var(--input-bg); border:1px solid var(--border2); border-radius:var(--rs);
+  color:var(--text); font-family:var(--font-mono); font-size:11.5px;
+  padding:6px 9px; outline:none; transition:border-color .13s;
+}
+.excluded-add-input::placeholder { color:var(--dim); }
+.excluded-add-input:focus { border-color:var(--green); }
 .excluded-list { display:flex; flex-direction:column; gap:5px; margin-bottom:4px; }
 .excluded-item {
   display:flex; align-items:center; gap:8px; padding:7px 10px;
