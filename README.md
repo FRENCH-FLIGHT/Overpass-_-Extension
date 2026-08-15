@@ -22,12 +22,19 @@
 - **Scroll Unlock** — removes artificial scroll locks set by pages
 - **Print Freedom** — allows printing or saving as PDF on restricted pages
 - **Always Visible** — keeps the site from detecting you've switched tabs
-- **Auto Overlay Removal** — automatically detects and hides paywalls and blocking modals
+- **Auto Overlay Removal** — automatically detects and hides paywalls and blocking modals, and un-clips text visually truncated behind a "subscribe to read more" fade
+- **Zoom** — restores pinch-to-zoom and page zoom when a site disables it
+
+### 🌓 Display
+- **Forced Dark Mode** — applies a dark theme to any site, even ones without native support
 
 ### ⚙️ Advanced
 - **DevTools Protection** — prevents sites from detecting when you open developer tools
 - **Console Guard** — stops pages from clearing your console history
 - **Custom Scripts** — run your own JavaScript automatically on any page, at the timing you choose, optionally restricted to a specific site or domain
+
+### 🌐 Network
+- **Anti-Adblock-Detection Blocking** — optionally blocks a curated list of known scripts whose only purpose is detecting and defeating content blockers, at the network level, before they ever run (off by default — enable it from Settings)
 
 ### 🛟 Support
 - **Update Check** — get notified right in the popup when a new version is available, with a direct link to it
@@ -38,24 +45,15 @@
 
 ## 🚀 Installation
 
-### ✅ Easy install — Chrome Extension Package (.crx)
-1. Download the latest **`overpass.crx`** from the [Releases](../../releases) page
+### 🛠️ Chrome / Edge (unpacked)
+1. Download and extract the ZIP from the [Releases](../../releases) page (or clone the repo)
 2. Go to `chrome://extensions/`
 3. Enable **Developer Mode** (toggle, top-right)
-4. **Drag and drop** the `.crx` file onto the extensions page
-5. Click **Add extension** in the confirmation dialog
-
-> **Note:** If Chrome blocks the drag-and-drop, use the manual install below.
-
-### 🛠️ Manual install (unpacked)
-1. Download and extract the ZIP from the [Releases](../../releases) page
-2. Go to `chrome://extensions/`
-3. Enable **Developer Mode**
-4. Click **Load unpacked** and select the extracted folder
+4. Click **Load unpacked** and select the extracted **`Overpass-v4.0.0/`** folder
 
 ### Firefox
 1. Go to `about:debugging` → **This Firefox**
-2. Click **Load Temporary Add-on** → select `manifest.json`
+2. Click **Load Temporary Add-on** → select `manifest.json` inside the `Overpass-v4.0.0/` folder
 
 > Firefox support requires version 128+
 
@@ -67,7 +65,7 @@ The popup is organised into **4 tabs**:
 
 | Tab | What it does |
 |-----|-------------|
-| **Protections** | Toggle each bypass on or off individually — quick presets at the top let you switch between common configurations instantly |
+| **Protections** | Toggle each bypass on or off individually — quick presets at the top let you switch between common configurations instantly, and the popup may suggest one for you based on the page you're on |
 | **Overlays** | View and restore elements hidden by the extension |
 | **Scripts** | Create, edit and manage custom JavaScript snippets |
 | **Settings** | Language, theme, save your own defaults, export/import a full backup, check for updates, report an issue, factory reset |
@@ -76,7 +74,7 @@ The popup is organised into **4 tabs**:
 - **Enable All / Disable All** — one-click toggle of all protections
 - **Pick** — click any element on the page to hide it (Escape to cancel)
 - Each protection category also has its own group switch, to enable or disable a whole category (e.g. all mouse-related protections) in a single click
-- A banner under the header lets you disable Overpass entirely on the current site, with no need to touch individual toggles — manage your excluded sites anytime from the Settings tab
+- A banner under the header lets you disable Overpass entirely on the current site, with no need to touch individual toggles — manage your excluded sites anytime from the Settings tab, where you can also exclude a whole domain (all its subdomains included) at once
 - The same banner lets you save the current settings as a profile for that site alone, distinct from your global settings
 - Global keyboard shortcuts (configurable at `chrome://extensions/shortcuts`) let you toggle everything, or just the current site, without opening the popup at all
 
@@ -87,6 +85,8 @@ The popup is organised into **4 tabs**:
 - Content gated server-side (never sent to your browser) cannot be recovered
 - DevTools bypass is marked experimental — some very advanced detection methods may still work
 - Excluding a site disables Overpass on that domain, but third-party content embedded from a *different* domain (e.g. some ads or widgets) is matched separately, since each is its own security context
+- Forced Dark Mode works by inverting page colors — reliable almost everywhere, but `position: fixed` elements can occasionally look slightly off on some sites, a known trade-off of this technique
+- The anti-adblock-detection blocklist is a small, curated starting point, not an exhaustive one — it will grow over time
 
 ---
 
@@ -99,10 +99,47 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v3.6.4 — Current
-- **Fixed** — You're now warned if a change (like importing a backup with large custom scripts) is too big to be saved, instead of silently failing to persist
+### v4.0.1 — Current
+- The project is now distributed as plain, readable source — no build or install step needed to get from download to a working extension
+- General cleanup and small reliability improvements
+
+### v4.0.0
+- **Major** — New "Forced Dark Mode" protection: apply a dark theme to any site, even without native support (off by default)
+- **Major** — New optional network-level blocking of known anti-adblock-detection scripts, so they never get a chance to run — a curated starting list, off by default, enable it from Settings
+- General cleanup and small reliability improvements
+
+### v3.9.0
+- **New** — A "Zoom" protection that restores pinch-to-zoom and page zoom on sites that disable it — a common accessibility issue, not just a paywall workaround
+- **New** — Auto overlay removal now also un-clips text that's visually truncated behind a "subscribe to read more" fade, not just fully-hidden content
+- Dropped the `.crx` install method — going forward, install as an unpacked folder (see Installation)
+- General cleanup and small reliability improvements
+
+### v3.8.3
+- **Security** — The installable extension is now shipped in a compacted form that's significantly harder to read or pick apart, with the original, well-documented source kept separately for maintenance
+- **Security** — Internal communication is now much harder for a site to detect or fingerprint, using identifiers unique to each installation instead of ones shared by every user of the extension
+- **Security** — Internal messages are now labeled with short, meaningless codes instead of descriptive names, making the extension's internal protocol much harder to study from the outside
+- **Security** — Removed an unused permission that could have let a site check whether Overpass is installed
+- **Fixed** — The popup's "Pick" button could occasionally stay stuck in picking mode after selecting an element on the page
+- General cleanup and small reliability improvements
+
+### v3.8.0
+- **New** — A fourth quick preset, "Video", tuned for streaming sites (keeps the player visible, unblocks scroll and clicks on overlays)
+- **New** — The popup can now gently suggest a matching preset when it recognizes the kind of page you're on (an article, a video) — purely a suggestion, never applied without your click, and easy to dismiss
+- General cleanup and small reliability improvements
+
+### v3.7.0
+- **New** — Excluding a site or saving a site profile now also accepts a whole domain (e.g. `*.example.com`) to cover all its subdomains at once, addable directly from Settings
+- **Improved** — DevTools Protection now catches a widely-used detection method it was missing before, making it noticeably more effective
 - **Fixed** — Turning off DevTools Protection now fully reverts it, instead of leaving some of it active until the page is reloaded
+- **Fixed** — Reduced the chance of the DevTools Protection interfering with unrelated site behaviour
 - **Improved** — Auto-hiding of popups now also catches ones that appear a few seconds after the page loads, not just ones present immediately
+- **Improved** — Exporting your settings now also includes your saved defaults, so restoring a backup doesn't leave anything behind
+- **Fixed** — Excluded sites, site profiles, and saved defaults now clearly warn you if a change couldn't be saved instead of failing silently
+- **Fixed** — Factory reset now correctly clears the excluded sites and site profiles shown in Settings right away, instead of only after reopening the popup
+- General cleanup and small reliability improvements
+
+### v3.6.4
+- **Fixed** — You're now warned if a change (like importing a backup with large custom scripts) is too big to be saved, instead of silently failing to persist
 - General cleanup and small reliability improvements
 
 ### v3.6.3
