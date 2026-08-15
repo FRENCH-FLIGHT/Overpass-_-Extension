@@ -1,5 +1,5 @@
 /**
- * Overpass v3.6.4 – background.js (Service Worker)
+ * Overpass v4.0.1 – background.js (Service Worker)
  *
  * Responsabilités :
  *   1. Génère et rotation du token d'authentification postMessage
@@ -11,12 +11,48 @@ const FACTORY_DEFAULTS = {
   contextmenu: true,  selectstart: true,  clipboard: true,  keyboard: true,
   dragdrop: true,     scroll: false,      cursor: true,     pointerEvents: false,
   print: true,        overlays: false,    devtools: false,  consoleProtect: false,
-  focus: false,       visibility: true,
+  focus: false,       visibility: true,   zoom: true,        darkMode: false,
 };
 
 // ── Dépôt GitHub — source des releases et des signalements ────────
 const REPO_SLUG = 'FRENCH-FLIGHT/Overpass-_-Extension';
 const REPO_URL  = `https://github.com/${REPO_SLUG}`;
+
+// Fait correspondre un hostname à un motif "exemple.com" (exact) ou
+// "*.exemple.com" (domaine + sous-domaines) — même sémantique que
+// content.js / inject.js, pour que le badge reflète correctement une
+// exclusion ou un profil défini via un motif générique.
+function hostMatchesPattern(host, pattern) {
+  if (!host || typeof pattern !== 'string') return false;
+  const p = pattern.trim().toLowerCase();
+  if (!p) return false;
+  const h = host.toLowerCase();
+  if (p.startsWith('*.')) {
+    const base = p.slice(2);
+    return !!base && (h === base || h.endsWith('.' + base));
+  }
+  return h === p;
+}
+
+function hostInList(host, list) {
+  return Array.isArray(list) && list.some(entry => hostMatchesPattern(host, entry));
+}
+
+function findSiteProfile(host, profiles) {
+  if (!host || !profiles || typeof profiles !== 'object') return null;
+  if (profiles[host]) return profiles[host];
+  let best = null, bestLen = -1;
+  Object.keys(profiles).forEach(key => {
+    const p = key.trim().toLowerCase();
+    if (!p.startsWith('*.')) return;
+    const base = p.slice(2);
+    if (base && hostMatchesPattern(host, key) && base.length > bestLen) {
+      best = profiles[key];
+      bestLen = base.length;
+    }
+  });
+  return best;
+}
 
 // ── Vérification de mise à jour ────────────────────────────────────
 // Lecture seule (api.github.com), throttlée pour rester très en-deçà des
@@ -86,8 +122,22 @@ function generateToken() {
   return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ── Clé de canal propre à cette installation ──────────────────────
+// Sert à faire migrer le trafic postMessage content.js↔inject.js loin des
+// noms de canal fixes (identiques pour toute installation de l'extension,
+// donc détectables de façon triviale et permanente par un site). Voir le
+// commentaire détaillé dans inject.js ("SECURE MESSAGE BUS"). Plus courte
+// que le token car ce n'est pas une frontière de sécurité — seulement un
+// identifiant de routage — le token reste seul responsable de
+// l'authentification des messages.
+function generateBusKey() {
+  const arr = new Uint8Array(8);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
-  await chrome.storage.local.set({ __op_token: generateToken() });
+  await chrome.storage.local.set({ __op_token: generateToken(), __op_bus: generateBusKey() });
   if (reason === 'install') {
     await chrome.storage.sync.set({
       ...FACTORY_DEFAULTS,
@@ -97,17 +147,44 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
       userDefaults: null,
       excludedSites: [],
       siteProfiles: {},
+      networkBlocking: false,
     });
   }
   updateAllBadges();
   checkForUpdate(false);
+  syncNetworkBlockingRuleset();
 });
 
-// Regénère le token à chaque démarrage du navigateur
+// Regénère le token (et la clé de canal) à chaque démarrage du navigateur
 chrome.runtime.onStartup.addListener(async () => {
-  await chrome.storage.local.set({ __op_token: generateToken() });
+  await chrome.storage.local.set({ __op_token: generateToken(), __op_bus: generateBusKey() });
   updateAllBadges();
   checkForUpdate(false);
+  syncNetworkBlockingRuleset();
+});
+
+// ── Blocage réseau des scripts anti-adblock connus ─────────────────
+// Fonctionnalité désactivée par défaut (opt-in) : contrairement aux
+// protections existantes (appliquées page par page via inject.js), ceci
+// bloque des requêtes réseau au niveau du navigateur via
+// declarativeNetRequest — un mécanisme différent, plus large, qu'on
+// préfère laisser l'utilisateur activer explicitement plutôt que
+// l'imposer silencieusement à la mise à jour.
+async function syncNetworkBlockingRuleset() {
+  try {
+    const { networkBlocking } = await chrome.storage.sync.get({ networkBlocking: false });
+    if (networkBlocking) {
+      await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: ['antiadblock'] });
+    } else {
+      await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: ['antiadblock'] });
+    }
+  } catch (_) {
+    // declarativeNetRequest indisponible ou ruleset déjà dans l'état voulu
+  }
+}
+
+chrome.storage.onChanged.addListener(changes => {
+  if (changes.networkBlocking) syncNetworkBlockingRuleset();
 });
 
 // ── Messages ─────────────────────────────────────────────────────
@@ -155,14 +232,14 @@ async function updateBadge(tabId) {
     });
 
     const excludedSites = Array.isArray(stored.excludedSites) ? stored.excludedSites : [];
-    if (host && excludedSites.includes(host)) {
+    if (host && hostInList(host, excludedSites)) {
       await chrome.action.setBadgeText({ text: '–', tabId });
       await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR_NEUTRAL, tabId });
       return;
     }
 
     const siteProfiles = (stored.siteProfiles && typeof stored.siteProfiles === 'object') ? stored.siteProfiles : {};
-    const profile = host ? siteProfiles[host] : null;
+    const profile = host ? findSiteProfile(host, siteProfiles) : null;
     const effective = (profile && typeof profile === 'object') ? { ...stored, ...profile } : stored;
     const active = Object.keys(FACTORY_DEFAULTS).filter(k => effective[k]).length;
 
@@ -228,8 +305,8 @@ chrome.commands.onCommand.addListener(async command => {
     try {
       const { excludedSites } = await chrome.storage.sync.get({ excludedSites: [] });
       const list = Array.isArray(excludedSites) ? excludedSites : [];
-      const next = list.includes(hostname)
-        ? list.filter(h => h !== hostname)
+      const next = hostInList(hostname, list)
+        ? list.filter(entry => !hostMatchesPattern(hostname, entry))
         : [...new Set([...list, hostname])];
       // content.js écoute déjà ce changement (storage.onChanged) dans chaque
       // onglet concerné — aucun message direct à envoyer ici.
