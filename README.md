@@ -99,7 +99,15 @@ Users are responsible for complying with the terms of service of websites they v
 
 ## 📋 Changelog
 
-### v4.0.1 — Current
+### v4.0.2 — Current
+- **Security** — Removed internal documentation comments from the source code to make it harder to study from the outside
+- **Improved** — Expanded the anti-adblock-detection blocklist with more known scripts
+- **Fixed** — The Zoom protection could occasionally keep restoring an already-removed page element instead of the current one on some dynamic pages
+- **Fixed** — The network-blocking toggle in Settings could show a stale state when multiple popups were open, or after a factory reset
+- **Fixed** — Exporting your settings now also includes the network-blocking preference, so restoring a backup doesn't leave it behind
+- General cleanup and small reliability improvements
+
+### v4.0.1
 - The project is now distributed as plain, readable source — no build or install step needed to get from download to a working extension
 - General cleanup and small reliability improvements
 
