@@ -1,613 +1,959 @@
-/**
- * Overpass v4.0.1 – popup.js
- *
- * Sécurité :
- * - Aucun innerHTML avec données non échappées (XSS safe)
- * - Validation des messages runtime entrants
- * - Aucun eval / new Function dans le contexte popup
- * - Les payloads reçus de content.js sont validés avant usage
- */
-
-// ════════════════════════════════════════════════════════════════
-// i18n (FR / EN / ES / DE)
-// ════════════════════════════════════════════════════════════════
 const I18N = {
-  fr:{
-    active:'Actif', inactive:'Inactif',
-    enableAll:'Tout activer', disableAll:'Tout désactiver',
-    picker:'Cibler', cancelPicker:'Annuler ciblage',
-    tabProtections:'Protections', tabOverlays:'Overlays',
-    tabScripts:'Scripts', tabSettings:'Paramètres',
-    groupMouse:'Souris & Sélection', groupClipboard:'Copier-coller & Clavier',
-    groupBehavior:'Comportement de page', groupDisplay:'Affichage', groupAdvanced:'Avancé', groupTools:'Outils rapides',
-    presetsLabel:'Préréglages :',
-    presetReading:'Lecture', presetReadingDesc:'Optimisé pour la lecture d\u2019articles et le contournement de paywalls',
-    presetStealth:'Furtif', presetStealthDesc:'Empreinte minimale : protège la confidentialité sans modifier le comportement du site',
-    presetBalanced:'Équilibré', presetBalancedDesc:'Réglages recommandés par défaut',
-    presetVideo:'Vidéo', presetVideoDesc:'Pensé pour le streaming : lecteur toujours visible, scroll et clics débloqués',
-    hintReadingText:'Cette page ressemble à un article ou un contenu bloqué (paywall)',
-    hintVideoText:'Cette page ressemble à un lecteur vidéo',
-    hintApply:'Essayer', hintDismiss:'Ignorer la suggestion',
+  fr: {
+    active: "Actif",
+    inactive: "Inactif",
+    enableAll: "Tout activer",
+    disableAll: "Tout désactiver",
+    picker: "Cibler",
+    cancelPicker: "Annuler ciblage",
+    tabProtections: "Protections",
+    tabOverlays: "Overlays",
+    tabScripts: "Scripts",
+    tabSettings: "Paramètres",
+    groupMouse: "Souris & Sélection",
+    groupClipboard: "Copier-coller & Clavier",
+    groupBehavior: "Comportement de page",
+    groupDisplay: "Affichage",
+    groupAdvanced: "Avancé",
+    groupTools: "Outils rapides",
+    presetsLabel: "Préréglages :",
+    presetReading: "Lecture",
+    presetReadingDesc: "Optimisé pour la lecture d’articles et le contournement de paywalls",
+    presetStealth: "Furtif",
+    presetStealthDesc: "Empreinte minimale : protège la confidentialité sans modifier le comportement du site",
+    presetBalanced: "Équilibré",
+    presetBalancedDesc: "Réglages recommandés par défaut",
+    presetVideo: "Vidéo",
+    presetVideoDesc: "Pensé pour le streaming : lecteur toujours visible, scroll et clics débloqués",
+    hintReadingText: "Cette page ressemble à un article ou un contenu bloqué (paywall)",
+    hintVideoText: "Cette page ressemble à un lecteur vidéo",
+    hintApply: "Essayer",
+    hintDismiss: "Ignorer la suggestion",
     toastPresetApplied: label => `✓ Préréglage "${label}" appliqué`,
-    groupToggleAll:'Tout activer/désactiver ce groupe',
-    fContextmenu:'Clic droit', dContextmenu:'Réactive le menu qui apparaît avec un clic droit',
-    fSelectstart:'Sélection de texte', dSelectstart:'Permet de surligner et copier du texte sur les sites qui le bloquent',
-    fCursor:'Curseur de souris', dCursor:"Force l'affichage du curseur quand un site le cache",
-    fPointerEvents:'Clics sur les overlays', dPointerEvents:'Rend cliquable le contenu caché sous les fenêtres bloquantes',
-    fClipboard:'Copier / Couper / Coller', dClipboard:'Autorise Ctrl+C, Ctrl+X, Ctrl+V sur les sites qui les désactivent',
-    fKeyboard:'Raccourcis clavier', dKeyboard:'Empêche le site de bloquer vos raccourcis habituels',
-    fFocus:'Anti-vol de focus', dFocus:"Empêche le site de déplacer automatiquement votre curseur",
-    fDragdrop:'Glisser-déposer', dDragdrop:"Rétablit le glisser-déposer d'images, fichiers et liens",
-    fScroll:'Défilement de page', dScroll:'Débloque le scroll quand un site fixe la page',
-    fPrint:'Impression', dPrint:"Permet d'imprimer ou sauvegarder en PDF les pages qui l'interdisent",
-    fVisibility:'Toujours visible', dVisibility:"Fait croire au site que vous êtes toujours sur cet onglet",
-    fZoom:'Zoom', dZoom:'Débloque le pinch-to-zoom quand un site le désactive',
-    fDarkMode:'Mode sombre forcé', dDarkMode:'Applique un thème sombre à n\u2019importe quel site, même sans support natif',
-    fOverlays:'Masquage auto des popups', dOverlays:'Détecte et masque automatiquement les grandes fenêtres bloquantes',
-    fDevtools:'Masquer les outils développeur', dDevtools:'Empêche le site de détecter que vous avez ouvert la console F12',
-    fConsole:'Protéger la console', dConsole:"Empêche le site d'effacer les messages dans la console",
-    experimental:'Expérimental',
-    toolSource:'Code source', toolCopyUrl:'Copier URL', toolIncognito:'Incognito',
-    overlayNone:'Aucun overlay masqué', restoreAll:'Tout restaurer', scanNow:'Scanner la page',
-    overlayEmptyMsg:'Aucun overlay supprimé.', overlayEmptyHint:'Activez la suppression auto ou utilisez Cibler.',
-    overlayAuto:'Auto', overlayManual:'Manuel',
-    newScript:'Nouveau script', examplesLabel:'Exemples :',
-    scriptNamePlaceholder:'Nom du script…', defaultScriptName:'Script',
-    codePlaceholder:"// Votre JavaScript ici\n// Accès complet au contexte de la page\n// Exemple : document.title = 'Mon titre';",
-    snippetAds:'Suppr. pubs', snippetForceEn:'Forcer EN', snippetShowImgs:'Afficher imgs', snippetAntiPaywall:'Anti-paywall',
-    snippetAdsCode:"// Supprimer les publicités\ndocument.querySelectorAll('[class*=\"ad\"],[id*=\"ad\"],[class*=\"pub\"]').forEach(el => el.remove());",
-    snippetForceEnCode:"// Forcer la langue en anglais\ndocument.documentElement.lang = 'en';",
-    snippetShowImgsCode:"// Rendre toutes les images visibles\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
-    snippetAntiPaywallCode:"// Supprimer les paywalls\ndocument.querySelectorAll('[class*=\"paywall\"],[class*=\"wall\"],[class*=\"gate\"]').forEach(el => el.remove());\ndocument.body.style.overflow = 'auto';",
-    themeToggle:'Basculer thème',
-    scriptEmptyMsg:'Aucun script personnalisé.', scriptEmptyHint:"Créez des scripts JS qui s'exécutent sur chaque page.",
-    runAtLabel:"Moment d'exécution :",
-    matchLabel:'Restreindre à un site (optionnel) :',
-    matchPlaceholder:'exemple.com ou *.exemple.com',
-    runStart:'Au démarrage — avant le contenu',
-    runEnd:'DOM prêt (structure chargée)',
-    runIdle:'Chargement complet (images, scripts…)',
-    deleteScript:'Supprimer', saveScript:'Enregistrer',
-    settingLanguage:'Langue / Language', settingTheme:'Apparence',
-    themeDark:'Sombre', themeLight:'Clair',
-    siteToggleTitle:'Actif sur ce site', toastSiteExcluded:'✓ Désactivé sur ce site', toastSiteIncluded:'✓ Réactivé sur ce site',
-    settingExcluded:'Sites exclus',
-    settingExcludedDesc:'Désactivez Overpass sur un site via le bandeau en haut du popup ; il apparaîtra ici.',
-    excludedEmptyMsg:'Aucun site exclu.', removeSite:'Retirer',
-    excludedAddPlaceholder:'exemple.com ou *.exemple.com', addSite:'Ajouter',
-    toastSiteAdded:'✓ Site ajouté aux exclusions', toastInvalidSite:'Adresse de site invalide',
-    settingProfiles:'Profils de site',
-    settingProfilesDesc:"Un site peut avoir sa propre combinaison de protections, différente du réglage global — enregistrez-la via l'icône dans le bandeau en haut du popup.",
-    profilesEmptyMsg:'Aucun profil de site enregistré.',
-    siteProfileSaveTitle:'Enregistrer les réglages actuels pour ce site',
-    siteProfileUpdateTitle:'Profil actif sur ce site — cliquer pour le mettre à jour',
-    confirmSaveProfileTitle:'Enregistrer ce profil de site ?',
-    confirmUpdateProfileTitle:'Mettre à jour ce profil de site ?',
+    groupToggleAll: "Tout activer/désactiver ce groupe",
+    fContextmenu: "Clic droit",
+    dContextmenu: "Réactive le menu qui apparaît avec un clic droit",
+    fSelectstart: "Sélection de texte",
+    dSelectstart: "Permet de surligner et copier du texte sur les sites qui le bloquent",
+    fCursor: "Curseur de souris",
+    dCursor: "Force l'affichage du curseur quand un site le cache",
+    fPointerEvents: "Clics sur les overlays",
+    dPointerEvents: "Rend cliquable le contenu caché sous les fenêtres bloquantes",
+    fClipboard: "Copier / Couper / Coller",
+    dClipboard: "Autorise Ctrl+C, Ctrl+X, Ctrl+V sur les sites qui les désactivent",
+    fKeyboard: "Raccourcis clavier",
+    dKeyboard: "Empêche le site de bloquer vos raccourcis habituels",
+    fFocus: "Anti-vol de focus",
+    dFocus: "Empêche le site de déplacer automatiquement votre curseur",
+    fDragdrop: "Glisser-déposer",
+    dDragdrop: "Rétablit le glisser-déposer d'images, fichiers et liens",
+    fScroll: "Défilement de page",
+    dScroll: "Débloque le scroll quand un site fixe la page",
+    fPrint: "Impression",
+    dPrint: "Permet d'imprimer ou sauvegarder en PDF les pages qui l'interdisent",
+    fVisibility: "Toujours visible",
+    dVisibility: "Fait croire au site que vous êtes toujours sur cet onglet",
+    fZoom: "Zoom",
+    dZoom: "Débloque le pinch-to-zoom quand un site le désactive",
+    fDarkMode: "Mode sombre forcé",
+    dDarkMode: "Applique un thème sombre à n’importe quel site, même sans support natif",
+    fOverlays: "Masquage auto des popups",
+    dOverlays: "Détecte et masque automatiquement les grandes fenêtres bloquantes",
+    fDevtools: "Masquer les outils développeur",
+    dDevtools: "Empêche le site de détecter que vous avez ouvert la console F12",
+    fConsole: "Protéger la console",
+    dConsole: "Empêche le site d'effacer les messages dans la console",
+    experimental: "Expérimental",
+    toolSource: "Code source",
+    toolCopyUrl: "Copier URL",
+    toolIncognito: "Incognito",
+    overlayNone: "Aucun overlay masqué",
+    restoreAll: "Tout restaurer",
+    scanNow: "Scanner la page",
+    overlayEmptyMsg: "Aucun overlay supprimé.",
+    overlayEmptyHint: "Activez la suppression auto ou utilisez Cibler.",
+    overlayAuto: "Auto",
+    overlayManual: "Manuel",
+    newScript: "Nouveau script",
+    examplesLabel: "Exemples :",
+    scriptNamePlaceholder: "Nom du script…",
+    defaultScriptName: "Script",
+    codePlaceholder: "// Votre JavaScript ici\n// Accès complet au contexte de la page\n// Exemple : document.title = 'Mon titre';",
+    snippetAds: "Suppr. pubs",
+    snippetForceEn: "Forcer EN",
+    snippetShowImgs: "Afficher imgs",
+    snippetAntiPaywall: "Anti-paywall",
+    snippetAdsCode: '// Supprimer les publicités\ndocument.querySelectorAll(\'[class*="ad"],[id*="ad"],[class*="pub"]\').forEach(el => el.remove());',
+    snippetForceEnCode: "// Forcer la langue en anglais\ndocument.documentElement.lang = 'en';",
+    snippetShowImgsCode: "// Rendre toutes les images visibles\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
+    snippetAntiPaywallCode: '// Supprimer les paywalls\ndocument.querySelectorAll(\'[class*="paywall"],[class*="wall"],[class*="gate"]\').forEach(el => el.remove());\ndocument.body.style.overflow = \'auto\';',
+    themeToggle: "Basculer thème",
+    scriptEmptyMsg: "Aucun script personnalisé.",
+    scriptEmptyHint: "Créez des scripts JS qui s'exécutent sur chaque page.",
+    runAtLabel: "Moment d'exécution :",
+    matchLabel: "Restreindre à un site (optionnel) :",
+    matchPlaceholder: "exemple.com ou *.exemple.com",
+    runStart: "Au démarrage — avant le contenu",
+    runEnd: "DOM prêt (structure chargée)",
+    runIdle: "Chargement complet (images, scripts…)",
+    deleteScript: "Supprimer",
+    saveScript: "Enregistrer",
+    settingLanguage: "Langue / Language",
+    settingTheme: "Apparence",
+    themeDark: "Sombre",
+    themeLight: "Clair",
+    siteToggleTitle: "Actif sur ce site",
+    toastSiteExcluded: "✓ Désactivé sur ce site",
+    toastSiteIncluded: "✓ Réactivé sur ce site",
+    settingExcluded: "Sites exclus",
+    settingExcludedDesc: "Désactivez Overpass sur un site via le bandeau en haut du popup ; il apparaîtra ici.",
+    excludedEmptyMsg: "Aucun site exclu.",
+    removeSite: "Retirer",
+    excludedAddPlaceholder: "exemple.com ou *.exemple.com",
+    addSite: "Ajouter",
+    toastSiteAdded: "✓ Site ajouté aux exclusions",
+    toastInvalidSite: "Adresse de site invalide",
+    settingProfiles: "Profils de site",
+    settingProfilesDesc: "Un site peut avoir sa propre combinaison de protections, différente du réglage global — enregistrez-la via l'icône dans le bandeau en haut du popup.",
+    profilesEmptyMsg: "Aucun profil de site enregistré.",
+    siteProfileSaveTitle: "Enregistrer les réglages actuels pour ce site",
+    siteProfileUpdateTitle: "Profil actif sur ce site — cliquer pour le mettre à jour",
+    confirmSaveProfileTitle: "Enregistrer ce profil de site ?",
+    confirmUpdateProfileTitle: "Mettre à jour ce profil de site ?",
     confirmProfileMsg: host => `Les réglages actuels seront enregistrés comme profil pour "${host}" et s'appliqueront uniquement sur ce site, à la place du réglage global.`,
-    toastProfileSaved:'✓ Profil de site enregistré',
-    settingDefaults:'Paramètres par défaut',
-    settingDefaultsDesc:'Sauvegardez votre configuration actuelle pour la réappliquer facilement.',
-    saveDefaults:'Sauvegarder comme défaut', loadDefaults:'Charger mes défauts',
-    settingBackup:'Sauvegarde',
-    settingBackupDesc:'Exportez tous vos réglages (protections, scripts, sites exclus) dans un fichier, ou restaurez une sauvegarde précédente.',
-    exportSettings:'Exporter', importSettings:'Importer',
-    toastExportDone:'✓ Sauvegarde téléchargée', toastImportDone:'✓ Réglages importés', toastImportError:'Fichier invalide ou illisible',
-    confirmImportTitle:'Importer cette sauvegarde ?',
-    importSummary: (sc, si, sp) => `Cette sauvegarde contient ${sc} script${sc>1?'s':''} personnalisé${sc>1?'s':''}, ${si} site${si>1?'s':''} exclu${si>1?'s':''} et ${sp} profil${sp>1?'s':''} de site. Vos réglages actuels seront remplacés. Continuer ?`,
-    settingNetworkBlocking:'Blocage réseau',
-    settingNetworkBlockingDesc:'Bloque, au niveau réseau, une liste de scripts connus servant uniquement à détecter et contrer les bloqueurs de contenu. Liste de départ, à faire grandir avec le temps.',
-    networkBlockingToggle:'Activer le blocage',
-    toastNetworkBlockingOn:'✓ Blocage réseau activé', toastNetworkBlockingOff:'Blocage réseau désactivé',
-    settingSupport:'Support',
-    updateUpToDate:'À jour', updateChecking:'Vérification…', updateCheckFailed:'Échec de la vérification',
-    toastStorageQuotaExceeded:'⚠ Trop volumineux pour être sauvegardé — réduisez la taille de vos scripts',
-    updateNoReleases:'Aucune version publiée pour l\u2019instant',
+    toastProfileSaved: "✓ Profil de site enregistré",
+    settingDefaults: "Paramètres par défaut",
+    settingDefaultsDesc: "Sauvegardez votre configuration actuelle pour la réappliquer facilement.",
+    saveDefaults: "Sauvegarder comme défaut",
+    loadDefaults: "Charger mes défauts",
+    settingBackup: "Sauvegarde",
+    settingBackupDesc: "Exportez tous vos réglages (protections, scripts, sites exclus) dans un fichier, ou restaurez une sauvegarde précédente.",
+    exportSettings: "Exporter",
+    importSettings: "Importer",
+    toastExportDone: "✓ Sauvegarde téléchargée",
+    toastImportDone: "✓ Réglages importés",
+    toastImportError: "Fichier invalide ou illisible",
+    confirmImportTitle: "Importer cette sauvegarde ?",
+    importSummary: (sc, si, sp) => `Cette sauvegarde contient ${sc} script${sc > 1 ? "s" : ""} personnalisé${sc > 1 ? "s" : ""}, ${si} site${si > 1 ? "s" : ""} exclu${si > 1 ? "s" : ""} et ${sp} profil${sp > 1 ? "s" : ""} de site. Vos réglages actuels seront remplacés. Continuer ?`,
+    settingNetworkBlocking: "Blocage réseau",
+    settingNetworkBlockingDesc: "Bloque, au niveau réseau, une liste de scripts connus servant uniquement à détecter et contrer les bloqueurs de contenu. Liste de départ, à faire grandir avec le temps.",
+    networkBlockingToggle: "Activer le blocage",
+    toastNetworkBlockingOn: "✓ Blocage réseau activé",
+    toastNetworkBlockingOff: "Blocage réseau désactivé",
+    settingSupport: "Support",
+    updateUpToDate: "À jour",
+    updateChecking: "Vérification…",
+    updateCheckFailed: "Échec de la vérification",
+    toastStorageQuotaExceeded: "⚠ Trop volumineux pour être sauvegardé — réduisez la taille de vos scripts",
+    updateNoReleases: "Aucune version publiée pour l’instant",
     updateAvailable: v => `Version ${v} disponible`,
-    checkUpdate:'Vérifier', goToRelease:'Mettre à jour',
-    toastUpdateAvailable: v => `✓ Version ${v} disponible !`, toastUpdateNone:'Vous êtes déjà à jour',
-    updateDotTitle:'Mise à jour disponible — cliquer pour en savoir plus',
-    settingReportDesc:"Un bypass ne fonctionne pas comme prévu ? Signalez-le pour nous aider à l'améliorer.",
-    reportIssue:'Signaler un problème',
-    reportSiteTitle:'Signaler un problème sur ce site',
-    settingFactory:'Réinitialisation',
-    settingFactoryDesc:'Remet tout à zéro et supprime vos scripts personnalisés.',
-    factoryReset:'Restaurer les paramètres usine',
-    settingAbout:'À propos', aboutEngine:'Moteur', aboutCompat:'Compatibilité',
-    aboutShortcuts:'Raccourcis', aboutShortcutsTitle:'Cliquer pour copier — à coller dans la barre d\'adresse',
-    toastShortcutsCopied:'✓ Chemin copié, collez-le dans la barre d\'adresse',
-    footerSync:'Synchronisé entre les onglets',
-    toastEnabled:'✓ Tout activé !', toastDisabled:'Tout désactivé',
-    toastDefaultsSaved:'✓ Défauts sauvegardés', toastDefaultsLoaded:'✓ Défauts chargés',
-    toastFactoryDone:'✓ Paramètres usine restaurés', toastUrlCopied:'✓ URL copiée',
-    toastOverlayRestored:'✓ Overlay restauré', toastAllRestored:'✓ Tous restaurés', toastScanDone:'🔍 Scan effectué',
-    toastScriptSaved:'✓ Script enregistré', toastScriptDeleted:'Script supprimé',
-    toastPicker:'🎯 Cliquez sur un élément…', toastPickerDone:'✓ Élément masqué',
-    toastPickerCancelled:'Ciblage annulé', toastCantOpen:'Impossible sur cette page',
-    toastNoDefaults:'Aucun défaut sauvegardé',
-    toastIncognito:"Activez le mode incognito dans les paramètres de l'extension",
-    confirmFactoryTitle:'Réinitialisation',
-    confirmFactoryMsg:'Supprimer tous les scripts et restaurer la configuration usine ?',
-    confirmDeleteTitle:'Supprimer le script',
-    confirmDeleteMsg:'Cette action est irréversible.',
-    confirmYes:'Confirmer', confirmCancel:'Annuler',
-    closeEditor:'Fermer', restoreOne:'Restaurer',
-    unnamedScript:'Sans nom', unknownElement:'(inconnu)',
-    emptyCode:'Code vide', readError:'Erreur de lecture',
-    overlayX: n => `${n} overlay${n>1?'s':''} masqué${n>1?'s':''}`,
-    ago: s => s < 60 ? `il y a ${s}s` : `il y a ${Math.floor(s/60)}min`,
+    checkUpdate: "Vérifier",
+    goToRelease: "Mettre à jour",
+    toastUpdateAvailable: v => `✓ Version ${v} disponible !`,
+    toastUpdateNone: "Vous êtes déjà à jour",
+    updateDotTitle: "Mise à jour disponible — cliquer pour en savoir plus",
+    settingReportDesc: "Un bypass ne fonctionne pas comme prévu ? Signalez-le pour nous aider à l'améliorer.",
+    reportIssue: "Signaler un problème",
+    reportSiteTitle: "Signaler un problème sur ce site",
+    settingFactory: "Réinitialisation",
+    settingFactoryDesc: "Remet tout à zéro et supprime vos scripts personnalisés.",
+    factoryReset: "Restaurer les paramètres usine",
+    settingAbout: "À propos",
+    aboutEngine: "Moteur",
+    aboutCompat: "Compatibilité",
+    aboutShortcuts: "Raccourcis",
+    aboutShortcutsTitle: "Cliquer pour copier — à coller dans la barre d'adresse",
+    toastShortcutsCopied: "✓ Chemin copié, collez-le dans la barre d'adresse",
+    footerSync: "Synchronisé entre les onglets",
+    toastEnabled: "✓ Tout activé !",
+    toastDisabled: "Tout désactivé",
+    toastDefaultsSaved: "✓ Défauts sauvegardés",
+    toastDefaultsLoaded: "✓ Défauts chargés",
+    toastFactoryDone: "✓ Paramètres usine restaurés",
+    toastUrlCopied: "✓ URL copiée",
+    toastOverlayRestored: "✓ Overlay restauré",
+    toastAllRestored: "✓ Tous restaurés",
+    toastScanDone: "🔍 Scan effectué",
+    toastScriptSaved: "✓ Script enregistré",
+    toastScriptDeleted: "Script supprimé",
+    toastPicker: "🎯 Cliquez sur un élément…",
+    toastPickerDone: "✓ Élément masqué",
+    toastPickerCancelled: "Ciblage annulé",
+    toastCantOpen: "Impossible sur cette page",
+    toastNoDefaults: "Aucun défaut sauvegardé",
+    toastIncognito: "Activez le mode incognito dans les paramètres de l'extension",
+    confirmFactoryTitle: "Réinitialisation",
+    confirmFactoryMsg: "Supprimer tous les scripts et restaurer la configuration usine ?",
+    confirmDeleteTitle: "Supprimer le script",
+    confirmDeleteMsg: "Cette action est irréversible.",
+    confirmYes: "Confirmer",
+    confirmCancel: "Annuler",
+    closeEditor: "Fermer",
+    restoreOne: "Restaurer",
+    unnamedScript: "Sans nom",
+    unknownElement: "(inconnu)",
+    emptyCode: "Code vide",
+    readError: "Erreur de lecture",
+    overlayX: n => `${n} overlay${n > 1 ? "s" : ""} masqué${n > 1 ? "s" : ""}`,
+    ago: s => s < 60 ? `il y a ${s}s` : `il y a ${Math.floor(s / 60)}min`
   },
-  en:{
-    active:'Active', inactive:'Inactive',
-    enableAll:'Enable all', disableAll:'Disable all',
-    picker:'Pick', cancelPicker:'Cancel pick',
-    tabProtections:'Protections', tabOverlays:'Overlays',
-    tabScripts:'Scripts', tabSettings:'Settings',
-    groupMouse:'Mouse & Selection', groupClipboard:'Clipboard & Keyboard',
-    groupBehavior:'Page Behavior', groupDisplay:'Display', groupAdvanced:'Advanced', groupTools:'Quick Tools',
-    presetsLabel:'Presets:',
-    presetReading:'Reading', presetReadingDesc:'Optimized for reading articles and bypassing paywalls',
-    presetStealth:'Stealth', presetStealthDesc:'Minimal footprint: protects privacy without changing site behavior',
-    presetBalanced:'Balanced', presetBalancedDesc:'Recommended default settings',
-    presetVideo:'Video', presetVideoDesc:'Built for streaming: player stays visible, scroll and clicks unblocked',
-    hintReadingText:'This page looks like an article or blocked content (paywall)',
-    hintVideoText:'This page looks like a video player',
-    hintApply:'Try it', hintDismiss:'Dismiss suggestion',
+  en: {
+    active: "Active",
+    inactive: "Inactive",
+    enableAll: "Enable all",
+    disableAll: "Disable all",
+    picker: "Pick",
+    cancelPicker: "Cancel pick",
+    tabProtections: "Protections",
+    tabOverlays: "Overlays",
+    tabScripts: "Scripts",
+    tabSettings: "Settings",
+    groupMouse: "Mouse & Selection",
+    groupClipboard: "Clipboard & Keyboard",
+    groupBehavior: "Page Behavior",
+    groupDisplay: "Display",
+    groupAdvanced: "Advanced",
+    groupTools: "Quick Tools",
+    presetsLabel: "Presets:",
+    presetReading: "Reading",
+    presetReadingDesc: "Optimized for reading articles and bypassing paywalls",
+    presetStealth: "Stealth",
+    presetStealthDesc: "Minimal footprint: protects privacy without changing site behavior",
+    presetBalanced: "Balanced",
+    presetBalancedDesc: "Recommended default settings",
+    presetVideo: "Video",
+    presetVideoDesc: "Built for streaming: player stays visible, scroll and clicks unblocked",
+    hintReadingText: "This page looks like an article or blocked content (paywall)",
+    hintVideoText: "This page looks like a video player",
+    hintApply: "Try it",
+    hintDismiss: "Dismiss suggestion",
     toastPresetApplied: label => `✓ "${label}" preset applied`,
-    groupToggleAll:'Toggle entire group',
-    fContextmenu:'Right-click', dContextmenu:'Re-enables the native context menu',
-    fSelectstart:'Text selection', dSelectstart:'Allows highlighting and copying text on restrictive sites',
-    fCursor:'Mouse cursor', dCursor:'Forces cursor display when a site hides it',
-    fPointerEvents:'Click-through overlays', dPointerEvents:'Makes content clickable under blocking popups',
-    fClipboard:'Copy / Cut / Paste', dClipboard:'Enables Ctrl+C, Ctrl+X, Ctrl+V on restrictive sites',
-    fKeyboard:'Keyboard shortcuts', dKeyboard:'Prevents sites from blocking your usual shortcuts',
-    fFocus:'Anti-focus steal', dFocus:'Prevents sites from automatically moving your cursor',
-    fDragdrop:'Drag & Drop', dDragdrop:'Restores drag and drop of images, files and links',
-    fScroll:'Page scrolling', dScroll:'Unblocks scroll when a site freezes the page',
-    fPrint:'Print', dPrint:'Allows printing or saving as PDF on restricted pages',
-    fVisibility:'Always visible', dVisibility:"Makes the site think you're always on this tab",
-    fZoom:'Zoom', dZoom:'Unblocks pinch-to-zoom when a site disables it',
-    fDarkMode:'Forced dark mode', dDarkMode:'Applies a dark theme to any site, even without native support',
-    fOverlays:'Auto popup removal', dOverlays:'Detects and hides large blocking windows automatically',
-    fDevtools:'Hide developer tools', dDevtools:'Prevents the site from detecting F12 is open',
-    fConsole:'Protect console', dConsole:'Prevents the site from clearing console messages',
-    experimental:'Experimental',
-    toolSource:'Source code', toolCopyUrl:'Copy URL', toolIncognito:'Incognito',
-    overlayNone:'No overlays hidden', restoreAll:'Restore all', scanNow:'Scan page',
-    overlayEmptyMsg:'No overlays removed.', overlayEmptyHint:'Enable auto removal or use the Pick button.',
-    overlayAuto:'Auto', overlayManual:'Manual',
-    newScript:'New script', examplesLabel:'Examples:',
-    scriptNamePlaceholder:'Script name…', defaultScriptName:'Script',
-    codePlaceholder:"// Your JavaScript here\n// Full access to the page context\n// Example: document.title = 'My title';",
-    snippetAds:'Remove ads', snippetForceEn:'Force EN', snippetShowImgs:'Show images', snippetAntiPaywall:'Anti-paywall',
-    snippetAdsCode:"// Remove ads\ndocument.querySelectorAll('[class*=\"ad\"],[id*=\"ad\"],[class*=\"pub\"]').forEach(el => el.remove());",
-    snippetForceEnCode:"// Force English language\ndocument.documentElement.lang = 'en';",
-    snippetShowImgsCode:"// Make all images visible\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
-    snippetAntiPaywallCode:"// Remove paywalls\ndocument.querySelectorAll('[class*=\"paywall\"],[class*=\"wall\"],[class*=\"gate\"]').forEach(el => el.remove());\ndocument.body.style.overflow = 'auto';",
-    themeToggle:'Toggle theme',
-    scriptEmptyMsg:'No custom scripts yet.', scriptEmptyHint:'Create JS scripts that run automatically on every page.',
-    runAtLabel:'Execution timing:',
-    matchLabel:'Restrict to a site (optional):',
-    matchPlaceholder:'example.com or *.example.com',
-    runStart:'On start — before page content',
-    runEnd:'DOM ready (structure loaded)',
-    runIdle:'Fully loaded (images, scripts…)',
-    deleteScript:'Delete', saveScript:'Save',
-    settingLanguage:'Language / Langue', settingTheme:'Appearance',
-    themeDark:'Dark', themeLight:'Light',
-    siteToggleTitle:'Active on this site', toastSiteExcluded:'✓ Disabled on this site', toastSiteIncluded:'✓ Re-enabled on this site',
-    settingExcluded:'Excluded sites',
-    settingExcludedDesc:'Disable Overpass on a site using the banner at the top of the popup; it will appear here.',
-    excludedEmptyMsg:'No excluded sites.', removeSite:'Remove',
-    excludedAddPlaceholder:'example.com or *.example.com', addSite:'Add',
-    toastSiteAdded:'✓ Site added to exclusions', toastInvalidSite:'Invalid site address',
-    settingProfiles:'Site profiles',
-    settingProfilesDesc:'A site can have its own combination of protections, different from the global setting — save it using the icon in the banner at the top of the popup.',
-    profilesEmptyMsg:'No site profiles saved.',
-    siteProfileSaveTitle:'Save the current settings for this site',
-    siteProfileUpdateTitle:'Profile active on this site — click to update it',
-    confirmSaveProfileTitle:'Save this site profile?',
-    confirmUpdateProfileTitle:'Update this site profile?',
+    groupToggleAll: "Toggle entire group",
+    fContextmenu: "Right-click",
+    dContextmenu: "Re-enables the native context menu",
+    fSelectstart: "Text selection",
+    dSelectstart: "Allows highlighting and copying text on restrictive sites",
+    fCursor: "Mouse cursor",
+    dCursor: "Forces cursor display when a site hides it",
+    fPointerEvents: "Click-through overlays",
+    dPointerEvents: "Makes content clickable under blocking popups",
+    fClipboard: "Copy / Cut / Paste",
+    dClipboard: "Enables Ctrl+C, Ctrl+X, Ctrl+V on restrictive sites",
+    fKeyboard: "Keyboard shortcuts",
+    dKeyboard: "Prevents sites from blocking your usual shortcuts",
+    fFocus: "Anti-focus steal",
+    dFocus: "Prevents sites from automatically moving your cursor",
+    fDragdrop: "Drag & Drop",
+    dDragdrop: "Restores drag and drop of images, files and links",
+    fScroll: "Page scrolling",
+    dScroll: "Unblocks scroll when a site freezes the page",
+    fPrint: "Print",
+    dPrint: "Allows printing or saving as PDF on restricted pages",
+    fVisibility: "Always visible",
+    dVisibility: "Makes the site think you're always on this tab",
+    fZoom: "Zoom",
+    dZoom: "Unblocks pinch-to-zoom when a site disables it",
+    fDarkMode: "Forced dark mode",
+    dDarkMode: "Applies a dark theme to any site, even without native support",
+    fOverlays: "Auto popup removal",
+    dOverlays: "Detects and hides large blocking windows automatically",
+    fDevtools: "Hide developer tools",
+    dDevtools: "Prevents the site from detecting F12 is open",
+    fConsole: "Protect console",
+    dConsole: "Prevents the site from clearing console messages",
+    experimental: "Experimental",
+    toolSource: "Source code",
+    toolCopyUrl: "Copy URL",
+    toolIncognito: "Incognito",
+    overlayNone: "No overlays hidden",
+    restoreAll: "Restore all",
+    scanNow: "Scan page",
+    overlayEmptyMsg: "No overlays removed.",
+    overlayEmptyHint: "Enable auto removal or use the Pick button.",
+    overlayAuto: "Auto",
+    overlayManual: "Manual",
+    newScript: "New script",
+    examplesLabel: "Examples:",
+    scriptNamePlaceholder: "Script name…",
+    defaultScriptName: "Script",
+    codePlaceholder: "// Your JavaScript here\n// Full access to the page context\n// Example: document.title = 'My title';",
+    snippetAds: "Remove ads",
+    snippetForceEn: "Force EN",
+    snippetShowImgs: "Show images",
+    snippetAntiPaywall: "Anti-paywall",
+    snippetAdsCode: '// Remove ads\ndocument.querySelectorAll(\'[class*="ad"],[id*="ad"],[class*="pub"]\').forEach(el => el.remove());',
+    snippetForceEnCode: "// Force English language\ndocument.documentElement.lang = 'en';",
+    snippetShowImgsCode: "// Make all images visible\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
+    snippetAntiPaywallCode: '// Remove paywalls\ndocument.querySelectorAll(\'[class*="paywall"],[class*="wall"],[class*="gate"]\').forEach(el => el.remove());\ndocument.body.style.overflow = \'auto\';',
+    themeToggle: "Toggle theme",
+    scriptEmptyMsg: "No custom scripts yet.",
+    scriptEmptyHint: "Create JS scripts that run automatically on every page.",
+    runAtLabel: "Execution timing:",
+    matchLabel: "Restrict to a site (optional):",
+    matchPlaceholder: "example.com or *.example.com",
+    runStart: "On start — before page content",
+    runEnd: "DOM ready (structure loaded)",
+    runIdle: "Fully loaded (images, scripts…)",
+    deleteScript: "Delete",
+    saveScript: "Save",
+    settingLanguage: "Language / Langue",
+    settingTheme: "Appearance",
+    themeDark: "Dark",
+    themeLight: "Light",
+    siteToggleTitle: "Active on this site",
+    toastSiteExcluded: "✓ Disabled on this site",
+    toastSiteIncluded: "✓ Re-enabled on this site",
+    settingExcluded: "Excluded sites",
+    settingExcludedDesc: "Disable Overpass on a site using the banner at the top of the popup; it will appear here.",
+    excludedEmptyMsg: "No excluded sites.",
+    removeSite: "Remove",
+    excludedAddPlaceholder: "example.com or *.example.com",
+    addSite: "Add",
+    toastSiteAdded: "✓ Site added to exclusions",
+    toastInvalidSite: "Invalid site address",
+    settingProfiles: "Site profiles",
+    settingProfilesDesc: "A site can have its own combination of protections, different from the global setting — save it using the icon in the banner at the top of the popup.",
+    profilesEmptyMsg: "No site profiles saved.",
+    siteProfileSaveTitle: "Save the current settings for this site",
+    siteProfileUpdateTitle: "Profile active on this site — click to update it",
+    confirmSaveProfileTitle: "Save this site profile?",
+    confirmUpdateProfileTitle: "Update this site profile?",
     confirmProfileMsg: host => `The current settings will be saved as a profile for "${host}" and will apply only on this site, instead of the global setting.`,
-    toastProfileSaved:'✓ Site profile saved',
-    settingDefaults:'Default settings',
-    settingDefaultsDesc:'Save your current configuration to easily re-apply it.',
-    saveDefaults:'Save as default', loadDefaults:'Load my defaults',
-    settingBackup:'Backup',
-    settingBackupDesc:'Export all your settings (protections, scripts, excluded sites) to a file, or restore a previous backup.',
-    exportSettings:'Export', importSettings:'Import',
-    toastExportDone:'✓ Backup downloaded', toastImportDone:'✓ Settings imported', toastImportError:'Invalid or unreadable file',
-    confirmImportTitle:'Import this backup?',
-    importSummary: (sc, si, sp) => `This backup contains ${sc} custom script${sc>1?'s':''}, ${si} excluded site${si>1?'s':''} and ${sp} site profile${sp>1?'s':''}. Your current settings will be replaced. Continue?`,
-    settingNetworkBlocking:'Network blocking',
-    settingNetworkBlockingDesc:'Blocks, at the network level, a list of known scripts whose only purpose is detecting and defeating content blockers. A starter list, meant to grow over time.',
-    networkBlockingToggle:'Enable blocking',
-    toastNetworkBlockingOn:'✓ Network blocking enabled', toastNetworkBlockingOff:'Network blocking disabled',
-    settingSupport:'Support',
-    updateUpToDate:'Up to date', updateChecking:'Checking…', updateCheckFailed:'Check failed',
-    toastStorageQuotaExceeded:'⚠ Too large to save — try reducing the size of your scripts',
-    updateNoReleases:'No version published yet',
+    toastProfileSaved: "✓ Site profile saved",
+    settingDefaults: "Default settings",
+    settingDefaultsDesc: "Save your current configuration to easily re-apply it.",
+    saveDefaults: "Save as default",
+    loadDefaults: "Load my defaults",
+    settingBackup: "Backup",
+    settingBackupDesc: "Export all your settings (protections, scripts, excluded sites) to a file, or restore a previous backup.",
+    exportSettings: "Export",
+    importSettings: "Import",
+    toastExportDone: "✓ Backup downloaded",
+    toastImportDone: "✓ Settings imported",
+    toastImportError: "Invalid or unreadable file",
+    confirmImportTitle: "Import this backup?",
+    importSummary: (sc, si, sp) => `This backup contains ${sc} custom script${sc > 1 ? "s" : ""}, ${si} excluded site${si > 1 ? "s" : ""} and ${sp} site profile${sp > 1 ? "s" : ""}. Your current settings will be replaced. Continue?`,
+    settingNetworkBlocking: "Network blocking",
+    settingNetworkBlockingDesc: "Blocks, at the network level, a list of known scripts whose only purpose is detecting and defeating content blockers. A starter list, meant to grow over time.",
+    networkBlockingToggle: "Enable blocking",
+    toastNetworkBlockingOn: "✓ Network blocking enabled",
+    toastNetworkBlockingOff: "Network blocking disabled",
+    settingSupport: "Support",
+    updateUpToDate: "Up to date",
+    updateChecking: "Checking…",
+    updateCheckFailed: "Check failed",
+    toastStorageQuotaExceeded: "⚠ Too large to save — try reducing the size of your scripts",
+    updateNoReleases: "No version published yet",
     updateAvailable: v => `Version ${v} available`,
-    checkUpdate:'Check', goToRelease:'Update',
-    toastUpdateAvailable: v => `✓ Version ${v} available!`, toastUpdateNone:"You're already up to date",
-    updateDotTitle:'Update available — click to learn more',
-    settingReportDesc:"A bypass isn't working as expected? Report it to help us improve.",
-    reportIssue:'Report an issue',
-    reportSiteTitle:'Report an issue on this site',
-    settingFactory:'Reset',
-    settingFactoryDesc:'Reset everything: removes custom scripts and restores original settings.',
-    factoryReset:'Restore factory settings',
-    settingAbout:'About', aboutEngine:'Engine', aboutCompat:'Compatibility',
-    aboutShortcuts:'Shortcuts', aboutShortcutsTitle:'Click to copy — paste it in the address bar',
-    toastShortcutsCopied:'✓ Path copied, paste it in the address bar',
-    footerSync:'Synced across tabs',
-    toastEnabled:'✓ All enabled!', toastDisabled:'All disabled',
-    toastDefaultsSaved:'✓ Defaults saved', toastDefaultsLoaded:'✓ Defaults loaded',
-    toastFactoryDone:'✓ Factory reset done', toastUrlCopied:'✓ URL copied',
-    toastOverlayRestored:'✓ Overlay restored', toastAllRestored:'✓ All restored', toastScanDone:'🔍 Scan complete',
-    toastScriptSaved:'✓ Script saved', toastScriptDeleted:'Script deleted',
-    toastPicker:'🎯 Click an element…', toastPickerDone:'✓ Element hidden',
-    toastPickerCancelled:'Pick cancelled', toastCantOpen:'Not available on this page',
-    toastNoDefaults:'No defaults saved yet',
-    toastIncognito:'Allow incognito in extension settings',
-    confirmFactoryTitle:'Factory Reset',
-    confirmFactoryMsg:'Delete all scripts and restore factory config?',
-    confirmDeleteTitle:'Delete script',
-    confirmDeleteMsg:'This action is irreversible.',
-    confirmYes:'Confirm', confirmCancel:'Cancel',
-    closeEditor:'Close', restoreOne:'Restore',
-    unnamedScript:'Unnamed', unknownElement:'(unknown)',
-    emptyCode:'Empty code', readError:'Read error',
-    overlayX: n => `${n} overlay${n>1?'s':''} hidden`,
-    ago: s => s < 60 ? `${s}s ago` : `${Math.floor(s/60)}min ago`,
+    checkUpdate: "Check",
+    goToRelease: "Update",
+    toastUpdateAvailable: v => `✓ Version ${v} available!`,
+    toastUpdateNone: "You're already up to date",
+    updateDotTitle: "Update available — click to learn more",
+    settingReportDesc: "A bypass isn't working as expected? Report it to help us improve.",
+    reportIssue: "Report an issue",
+    reportSiteTitle: "Report an issue on this site",
+    settingFactory: "Reset",
+    settingFactoryDesc: "Reset everything: removes custom scripts and restores original settings.",
+    factoryReset: "Restore factory settings",
+    settingAbout: "About",
+    aboutEngine: "Engine",
+    aboutCompat: "Compatibility",
+    aboutShortcuts: "Shortcuts",
+    aboutShortcutsTitle: "Click to copy — paste it in the address bar",
+    toastShortcutsCopied: "✓ Path copied, paste it in the address bar",
+    footerSync: "Synced across tabs",
+    toastEnabled: "✓ All enabled!",
+    toastDisabled: "All disabled",
+    toastDefaultsSaved: "✓ Defaults saved",
+    toastDefaultsLoaded: "✓ Defaults loaded",
+    toastFactoryDone: "✓ Factory reset done",
+    toastUrlCopied: "✓ URL copied",
+    toastOverlayRestored: "✓ Overlay restored",
+    toastAllRestored: "✓ All restored",
+    toastScanDone: "🔍 Scan complete",
+    toastScriptSaved: "✓ Script saved",
+    toastScriptDeleted: "Script deleted",
+    toastPicker: "🎯 Click an element…",
+    toastPickerDone: "✓ Element hidden",
+    toastPickerCancelled: "Pick cancelled",
+    toastCantOpen: "Not available on this page",
+    toastNoDefaults: "No defaults saved yet",
+    toastIncognito: "Allow incognito in extension settings",
+    confirmFactoryTitle: "Factory Reset",
+    confirmFactoryMsg: "Delete all scripts and restore factory config?",
+    confirmDeleteTitle: "Delete script",
+    confirmDeleteMsg: "This action is irreversible.",
+    confirmYes: "Confirm",
+    confirmCancel: "Cancel",
+    closeEditor: "Close",
+    restoreOne: "Restore",
+    unnamedScript: "Unnamed",
+    unknownElement: "(unknown)",
+    emptyCode: "Empty code",
+    readError: "Read error",
+    overlayX: n => `${n} overlay${n > 1 ? "s" : ""} hidden`,
+    ago: s => s < 60 ? `${s}s ago` : `${Math.floor(s / 60)}min ago`
   },
-  es:{
-    active:'Activo', inactive:'Inactivo',
-    enableAll:'Activar todo', disableAll:'Desactivar todo',
-    picker:'Selec.', cancelPicker:'Cancelar',
-    tabProtections:'Protecciones', tabOverlays:'Overlays',
-    tabScripts:'Scripts', tabSettings:'Ajustes',
-    groupMouse:'Ratón y Selección', groupClipboard:'Portapapeles y Teclado',
-    groupBehavior:'Comportamiento', groupDisplay:'Visualización', groupAdvanced:'Avanzado', groupTools:'Herramientas',
-    presetsLabel:'Preajustes:',
-    presetReading:'Lectura', presetReadingDesc:'Optimizado para leer artículos y evitar paywalls',
-    presetStealth:'Sigiloso', presetStealthDesc:'Huella mínima: protege la privacidad sin cambiar el comportamiento del sitio',
-    presetBalanced:'Equilibrado', presetBalancedDesc:'Ajustes recomendados por defecto',
-    presetVideo:'Vídeo', presetVideoDesc:'Pensado para streaming: reproductor siempre visible, scroll y clics desbloqueados',
-    hintReadingText:'Esta página parece un artículo o contenido bloqueado (paywall)',
-    hintVideoText:'Esta página parece un reproductor de vídeo',
-    hintApply:'Probar', hintDismiss:'Descartar sugerencia',
+  es: {
+    active: "Activo",
+    inactive: "Inactivo",
+    enableAll: "Activar todo",
+    disableAll: "Desactivar todo",
+    picker: "Selec.",
+    cancelPicker: "Cancelar",
+    tabProtections: "Protecciones",
+    tabOverlays: "Overlays",
+    tabScripts: "Scripts",
+    tabSettings: "Ajustes",
+    groupMouse: "Ratón y Selección",
+    groupClipboard: "Portapapeles y Teclado",
+    groupBehavior: "Comportamiento",
+    groupDisplay: "Visualización",
+    groupAdvanced: "Avanzado",
+    groupTools: "Herramientas",
+    presetsLabel: "Preajustes:",
+    presetReading: "Lectura",
+    presetReadingDesc: "Optimizado para leer artículos y evitar paywalls",
+    presetStealth: "Sigiloso",
+    presetStealthDesc: "Huella mínima: protege la privacidad sin cambiar el comportamiento del sitio",
+    presetBalanced: "Equilibrado",
+    presetBalancedDesc: "Ajustes recomendados por defecto",
+    presetVideo: "Vídeo",
+    presetVideoDesc: "Pensado para streaming: reproductor siempre visible, scroll y clics desbloqueados",
+    hintReadingText: "Esta página parece un artículo o contenido bloqueado (paywall)",
+    hintVideoText: "Esta página parece un reproductor de vídeo",
+    hintApply: "Probar",
+    hintDismiss: "Descartar sugerencia",
     toastPresetApplied: label => `✓ Preajuste "${label}" aplicado`,
-    groupToggleAll:'Activar/desactivar todo el grupo',
-    fContextmenu:'Clic derecho', dContextmenu:'Reactiva el menú contextual nativo',
-    fSelectstart:'Selección de texto', dSelectstart:'Permite resaltar y copiar texto en sitios restrictivos',
-    fCursor:'Cursor', dCursor:'Fuerza la visibilidad del cursor',
-    fPointerEvents:'Clics en overlays', dPointerEvents:'Hace clicable el contenido bajo popups bloqueantes',
-    fClipboard:'Copiar / Cortar / Pegar', dClipboard:'Activa Ctrl+C, Ctrl+X, Ctrl+V en sitios restrictivos',
-    fKeyboard:'Atajos de teclado', dKeyboard:'Evita que el sitio bloquee tus atajos',
-    fFocus:'Anti-robo de foco', dFocus:'Evita que el sitio mueva automáticamente tu cursor',
-    fDragdrop:'Arrastrar y soltar', dDragdrop:'Restaura el drag&drop de imágenes, archivos y enlaces',
-    fScroll:'Desplazamiento', dScroll:'Desbloquea el scroll cuando un sitio lo congela',
-    fPrint:'Impresión', dPrint:'Permite imprimir o guardar como PDF páginas que lo prohíben',
-    fVisibility:'Siempre visible', dVisibility:'Hace creer al sitio que siempre estás en esta pestaña',
-    fZoom:'Zoom', dZoom:'Desbloquea el pinch-to-zoom cuando un sitio lo desactiva',
-    fDarkMode:'Modo oscuro forzado', dDarkMode:'Aplica un tema oscuro a cualquier sitio, incluso sin soporte nativo',
-    fOverlays:'Eliminar popups auto', dOverlays:'Detecta y oculta automáticamente ventanas bloqueantes',
-    fDevtools:'Ocultar dev tools', dDevtools:'Evita que el sitio detecte F12 abierto',
-    fConsole:'Proteger consola', dConsole:'Evita que el sitio borre los mensajes de consola',
-    experimental:'Experimental',
-    toolSource:'Código fuente', toolCopyUrl:'Copiar URL', toolIncognito:'Incógnito',
-    overlayNone:'Sin overlays ocultos', restoreAll:'Restaurar todo', scanNow:'Escanear página',
-    overlayEmptyMsg:'No hay overlays eliminados.', overlayEmptyHint:'Activa la eliminación auto o usa Selec.',
-    overlayAuto:'Auto', overlayManual:'Manual',
-    newScript:'Nuevo script', examplesLabel:'Ejemplos:',
-    scriptNamePlaceholder:'Nombre del script…', defaultScriptName:'Script',
-    codePlaceholder:"// Tu JavaScript aquí\n// Acceso completo al contexto de la página\n// Ejemplo: document.title = 'Mi título';",
-    snippetAds:'Quitar anuncios', snippetForceEn:'Forzar EN', snippetShowImgs:'Mostrar imgs', snippetAntiPaywall:'Anti-paywall',
-    snippetAdsCode:"// Quitar anuncios\ndocument.querySelectorAll('[class*=\"ad\"],[id*=\"ad\"],[class*=\"pub\"]').forEach(el => el.remove());",
-    snippetForceEnCode:"// Forzar idioma inglés\ndocument.documentElement.lang = 'en';",
-    snippetShowImgsCode:"// Mostrar todas las imágenes\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
-    snippetAntiPaywallCode:"// Quitar paywalls\ndocument.querySelectorAll('[class*=\"paywall\"],[class*=\"wall\"],[class*=\"gate\"]').forEach(el => el.remove());\ndocument.body.style.overflow = 'auto';",
-    themeToggle:'Cambiar tema',
-    scriptEmptyMsg:'Sin scripts personalizados.', scriptEmptyHint:'Crea scripts JS que se ejecuten en cada página.',
-    runAtLabel:'Momento de ejecución:',
-    matchLabel:'Restringir a un sitio (opcional):',
-    matchPlaceholder:'ejemplo.com o *.ejemplo.com',
-    runStart:'Al inicio — antes del contenido',
-    runEnd:'DOM listo',
-    runIdle:'Carga completa',
-    deleteScript:'Eliminar', saveScript:'Guardar',
-    settingLanguage:'Idioma / Language', settingTheme:'Apariencia',
-    themeDark:'Oscuro', themeLight:'Claro',
-    siteToggleTitle:'Activo en este sitio', toastSiteExcluded:'✓ Desactivado en este sitio', toastSiteIncluded:'✓ Reactivado en este sitio',
-    settingExcluded:'Sitios excluidos',
-    settingExcludedDesc:'Desactiva Overpass en un sitio con el banner superior; aparecerá aquí.',
-    excludedEmptyMsg:'Sin sitios excluidos.', removeSite:'Quitar',
-    excludedAddPlaceholder:'ejemplo.com o *.ejemplo.com', addSite:'Añadir',
-    toastSiteAdded:'✓ Sitio añadido a las exclusiones', toastInvalidSite:'Dirección de sitio no válida',
-    settingProfiles:'Perfiles de sitio',
-    settingProfilesDesc:'Un sitio puede tener su propia combinación de protecciones, distinta del ajuste global — guárdala con el icono del banner superior del popup.',
-    profilesEmptyMsg:'Sin perfiles de sitio guardados.',
-    siteProfileSaveTitle:'Guardar los ajustes actuales para este sitio',
-    siteProfileUpdateTitle:'Perfil activo en este sitio — clic para actualizarlo',
-    confirmSaveProfileTitle:'¿Guardar este perfil de sitio?',
-    confirmUpdateProfileTitle:'¿Actualizar este perfil de sitio?',
+    groupToggleAll: "Activar/desactivar todo el grupo",
+    fContextmenu: "Clic derecho",
+    dContextmenu: "Reactiva el menú contextual nativo",
+    fSelectstart: "Selección de texto",
+    dSelectstart: "Permite resaltar y copiar texto en sitios restrictivos",
+    fCursor: "Cursor",
+    dCursor: "Fuerza la visibilidad del cursor",
+    fPointerEvents: "Clics en overlays",
+    dPointerEvents: "Hace clicable el contenido bajo popups bloqueantes",
+    fClipboard: "Copiar / Cortar / Pegar",
+    dClipboard: "Activa Ctrl+C, Ctrl+X, Ctrl+V en sitios restrictivos",
+    fKeyboard: "Atajos de teclado",
+    dKeyboard: "Evita que el sitio bloquee tus atajos",
+    fFocus: "Anti-robo de foco",
+    dFocus: "Evita que el sitio mueva automáticamente tu cursor",
+    fDragdrop: "Arrastrar y soltar",
+    dDragdrop: "Restaura el drag&drop de imágenes, archivos y enlaces",
+    fScroll: "Desplazamiento",
+    dScroll: "Desbloquea el scroll cuando un sitio lo congela",
+    fPrint: "Impresión",
+    dPrint: "Permite imprimir o guardar como PDF páginas que lo prohíben",
+    fVisibility: "Siempre visible",
+    dVisibility: "Hace creer al sitio que siempre estás en esta pestaña",
+    fZoom: "Zoom",
+    dZoom: "Desbloquea el pinch-to-zoom cuando un sitio lo desactiva",
+    fDarkMode: "Modo oscuro forzado",
+    dDarkMode: "Aplica un tema oscuro a cualquier sitio, incluso sin soporte nativo",
+    fOverlays: "Eliminar popups auto",
+    dOverlays: "Detecta y oculta automáticamente ventanas bloqueantes",
+    fDevtools: "Ocultar dev tools",
+    dDevtools: "Evita que el sitio detecte F12 abierto",
+    fConsole: "Proteger consola",
+    dConsole: "Evita que el sitio borre los mensajes de consola",
+    experimental: "Experimental",
+    toolSource: "Código fuente",
+    toolCopyUrl: "Copiar URL",
+    toolIncognito: "Incógnito",
+    overlayNone: "Sin overlays ocultos",
+    restoreAll: "Restaurar todo",
+    scanNow: "Escanear página",
+    overlayEmptyMsg: "No hay overlays eliminados.",
+    overlayEmptyHint: "Activa la eliminación auto o usa Selec.",
+    overlayAuto: "Auto",
+    overlayManual: "Manual",
+    newScript: "Nuevo script",
+    examplesLabel: "Ejemplos:",
+    scriptNamePlaceholder: "Nombre del script…",
+    defaultScriptName: "Script",
+    codePlaceholder: "// Tu JavaScript aquí\n// Acceso completo al contexto de la página\n// Ejemplo: document.title = 'Mi título';",
+    snippetAds: "Quitar anuncios",
+    snippetForceEn: "Forzar EN",
+    snippetShowImgs: "Mostrar imgs",
+    snippetAntiPaywall: "Anti-paywall",
+    snippetAdsCode: '// Quitar anuncios\ndocument.querySelectorAll(\'[class*="ad"],[id*="ad"],[class*="pub"]\').forEach(el => el.remove());',
+    snippetForceEnCode: "// Forzar idioma inglés\ndocument.documentElement.lang = 'en';",
+    snippetShowImgsCode: "// Mostrar todas las imágenes\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
+    snippetAntiPaywallCode: '// Quitar paywalls\ndocument.querySelectorAll(\'[class*="paywall"],[class*="wall"],[class*="gate"]\').forEach(el => el.remove());\ndocument.body.style.overflow = \'auto\';',
+    themeToggle: "Cambiar tema",
+    scriptEmptyMsg: "Sin scripts personalizados.",
+    scriptEmptyHint: "Crea scripts JS que se ejecuten en cada página.",
+    runAtLabel: "Momento de ejecución:",
+    matchLabel: "Restringir a un sitio (opcional):",
+    matchPlaceholder: "ejemplo.com o *.ejemplo.com",
+    runStart: "Al inicio — antes del contenido",
+    runEnd: "DOM listo",
+    runIdle: "Carga completa",
+    deleteScript: "Eliminar",
+    saveScript: "Guardar",
+    settingLanguage: "Idioma / Language",
+    settingTheme: "Apariencia",
+    themeDark: "Oscuro",
+    themeLight: "Claro",
+    siteToggleTitle: "Activo en este sitio",
+    toastSiteExcluded: "✓ Desactivado en este sitio",
+    toastSiteIncluded: "✓ Reactivado en este sitio",
+    settingExcluded: "Sitios excluidos",
+    settingExcludedDesc: "Desactiva Overpass en un sitio con el banner superior; aparecerá aquí.",
+    excludedEmptyMsg: "Sin sitios excluidos.",
+    removeSite: "Quitar",
+    excludedAddPlaceholder: "ejemplo.com o *.ejemplo.com",
+    addSite: "Añadir",
+    toastSiteAdded: "✓ Sitio añadido a las exclusiones",
+    toastInvalidSite: "Dirección de sitio no válida",
+    settingProfiles: "Perfiles de sitio",
+    settingProfilesDesc: "Un sitio puede tener su propia combinación de protecciones, distinta del ajuste global — guárdala con el icono del banner superior del popup.",
+    profilesEmptyMsg: "Sin perfiles de sitio guardados.",
+    siteProfileSaveTitle: "Guardar los ajustes actuales para este sitio",
+    siteProfileUpdateTitle: "Perfil activo en este sitio — clic para actualizarlo",
+    confirmSaveProfileTitle: "¿Guardar este perfil de sitio?",
+    confirmUpdateProfileTitle: "¿Actualizar este perfil de sitio?",
     confirmProfileMsg: host => `Los ajustes actuales se guardarán como perfil para "${host}" y se aplicarán solo en este sitio, en lugar del ajuste global.`,
-    toastProfileSaved:'✓ Perfil de sitio guardado',
-    settingDefaults:'Ajustes por defecto',
-    settingDefaultsDesc:'Guarda la configuración actual para reaplicarla fácilmente.',
-    saveDefaults:'Guardar como defecto', loadDefaults:'Cargar mis valores',
-    settingBackup:'Copia de seguridad',
-    settingBackupDesc:'Exporta todos tus ajustes (protecciones, scripts, sitios excluidos) a un archivo, o restaura una copia anterior.',
-    exportSettings:'Exportar', importSettings:'Importar',
-    toastExportDone:'✓ Copia descargada', toastImportDone:'✓ Ajustes importados', toastImportError:'Archivo inválido o ilegible',
-    confirmImportTitle:'¿Importar esta copia de seguridad?',
-    importSummary: (sc, si, sp) => `Esta copia contiene ${sc} script${sc>1?'s':''} personalizado${sc>1?'s':''}, ${si} sitio${si>1?'s':''} excluido${si>1?'s':''} y ${sp} perfil${sp>1?'es':''} de sitio. Tus ajustes actuales serán reemplazados. ¿Continuar?`,
-    settingNetworkBlocking:'Bloqueo de red',
-    settingNetworkBlockingDesc:'Bloquea, a nivel de red, una lista de scripts conocidos cuya única función es detectar y contrarrestar los bloqueadores de contenido. Lista inicial, pensada para crecer con el tiempo.',
-    networkBlockingToggle:'Activar bloqueo',
-    toastNetworkBlockingOn:'✓ Bloqueo de red activado', toastNetworkBlockingOff:'Bloqueo de red desactivado',
-    settingSupport:'Soporte',
-    updateUpToDate:'Actualizado', updateChecking:'Comprobando…', updateCheckFailed:'Fallo al comprobar',
-    toastStorageQuotaExceeded:'⚠ Demasiado grande para guardar — reduce el tamaño de tus scripts',
-    updateNoReleases:'Aún no hay versiones publicadas',
+    toastProfileSaved: "✓ Perfil de sitio guardado",
+    settingDefaults: "Ajustes por defecto",
+    settingDefaultsDesc: "Guarda la configuración actual para reaplicarla fácilmente.",
+    saveDefaults: "Guardar como defecto",
+    loadDefaults: "Cargar mis valores",
+    settingBackup: "Copia de seguridad",
+    settingBackupDesc: "Exporta todos tus ajustes (protecciones, scripts, sitios excluidos) a un archivo, o restaura una copia anterior.",
+    exportSettings: "Exportar",
+    importSettings: "Importar",
+    toastExportDone: "✓ Copia descargada",
+    toastImportDone: "✓ Ajustes importados",
+    toastImportError: "Archivo inválido o ilegible",
+    confirmImportTitle: "¿Importar esta copia de seguridad?",
+    importSummary: (sc, si, sp) => `Esta copia contiene ${sc} script${sc > 1 ? "s" : ""} personalizado${sc > 1 ? "s" : ""}, ${si} sitio${si > 1 ? "s" : ""} excluido${si > 1 ? "s" : ""} y ${sp} perfil${sp > 1 ? "es" : ""} de sitio. Tus ajustes actuales serán reemplazados. ¿Continuar?`,
+    settingNetworkBlocking: "Bloqueo de red",
+    settingNetworkBlockingDesc: "Bloquea, a nivel de red, una lista de scripts conocidos cuya única función es detectar y contrarrestar los bloqueadores de contenido. Lista inicial, pensada para crecer con el tiempo.",
+    networkBlockingToggle: "Activar bloqueo",
+    toastNetworkBlockingOn: "✓ Bloqueo de red activado",
+    toastNetworkBlockingOff: "Bloqueo de red desactivado",
+    settingSupport: "Soporte",
+    updateUpToDate: "Actualizado",
+    updateChecking: "Comprobando…",
+    updateCheckFailed: "Fallo al comprobar",
+    toastStorageQuotaExceeded: "⚠ Demasiado grande para guardar — reduce el tamaño de tus scripts",
+    updateNoReleases: "Aún no hay versiones publicadas",
     updateAvailable: v => `Versión ${v} disponible`,
-    checkUpdate:'Comprobar', goToRelease:'Actualizar',
-    toastUpdateAvailable: v => `✓ ¡Versión ${v} disponible!`, toastUpdateNone:'Ya tienes la última versión',
-    updateDotTitle:'Actualización disponible — clic para saber más',
-    settingReportDesc:'¿Un bypass no funciona como debería? Repórtalo para ayudarnos a mejorar.',
-    reportIssue:'Reportar un problema',
-    reportSiteTitle:'Reportar un problema en este sitio',
-    settingFactory:'Restablecimiento',
-    settingFactoryDesc:'Reinicia todo: elimina scripts y restaura ajustes originales.',
-    factoryReset:'Restaurar ajustes de fábrica',
-    settingAbout:'Acerca de', aboutEngine:'Motor', aboutCompat:'Compatibilidad',
-    aboutShortcuts:'Atajos', aboutShortcutsTitle:'Clic para copiar — pégalo en la barra de direcciones',
-    toastShortcutsCopied:'✓ Ruta copiada, pégala en la barra de direcciones',
-    footerSync:'Sincronizado entre pestañas',
-    toastEnabled:'✓ ¡Todo activado!', toastDisabled:'Todo desactivado',
-    toastDefaultsSaved:'✓ Valores guardados', toastDefaultsLoaded:'✓ Valores cargados',
-    toastFactoryDone:'✓ Restablecido', toastUrlCopied:'✓ URL copiada',
-    toastOverlayRestored:'✓ Overlay restaurado', toastAllRestored:'✓ Todo restaurado', toastScanDone:'🔍 Escaneo completo',
-    toastScriptSaved:'✓ Script guardado', toastScriptDeleted:'Script eliminado',
-    toastPicker:'🎯 Haz clic en un elemento…', toastPickerDone:'✓ Elemento oculto',
-    toastPickerCancelled:'Selección cancelada', toastCantOpen:'No disponible en esta página',
-    toastNoDefaults:'Sin valores por defecto',
-    toastIncognito:'Permite incógnito en ajustes de extensión',
-    confirmFactoryTitle:'Restablecimiento',
-    confirmFactoryMsg:'¿Eliminar scripts y restaurar ajustes de fábrica?',
-    confirmDeleteTitle:'Eliminar script',
-    confirmDeleteMsg:'Esta acción es irreversible.',
-    confirmYes:'Confirmar', confirmCancel:'Cancelar',
-    closeEditor:'Cerrar', restoreOne:'Restaurar',
-    unnamedScript:'Sin nombre', unknownElement:'(desconocido)',
-    emptyCode:'Código vacío', readError:'Error de lectura',
-    overlayX: n => `${n} overlay${n>1?'s':''} oculto${n>1?'s':''}`,
-    ago: s => s < 60 ? `hace ${s}s` : `hace ${Math.floor(s/60)}min`,
+    checkUpdate: "Comprobar",
+    goToRelease: "Actualizar",
+    toastUpdateAvailable: v => `✓ ¡Versión ${v} disponible!`,
+    toastUpdateNone: "Ya tienes la última versión",
+    updateDotTitle: "Actualización disponible — clic para saber más",
+    settingReportDesc: "¿Un bypass no funciona como debería? Repórtalo para ayudarnos a mejorar.",
+    reportIssue: "Reportar un problema",
+    reportSiteTitle: "Reportar un problema en este sitio",
+    settingFactory: "Restablecimiento",
+    settingFactoryDesc: "Reinicia todo: elimina scripts y restaura ajustes originales.",
+    factoryReset: "Restaurar ajustes de fábrica",
+    settingAbout: "Acerca de",
+    aboutEngine: "Motor",
+    aboutCompat: "Compatibilidad",
+    aboutShortcuts: "Atajos",
+    aboutShortcutsTitle: "Clic para copiar — pégalo en la barra de direcciones",
+    toastShortcutsCopied: "✓ Ruta copiada, pégala en la barra de direcciones",
+    footerSync: "Sincronizado entre pestañas",
+    toastEnabled: "✓ ¡Todo activado!",
+    toastDisabled: "Todo desactivado",
+    toastDefaultsSaved: "✓ Valores guardados",
+    toastDefaultsLoaded: "✓ Valores cargados",
+    toastFactoryDone: "✓ Restablecido",
+    toastUrlCopied: "✓ URL copiada",
+    toastOverlayRestored: "✓ Overlay restaurado",
+    toastAllRestored: "✓ Todo restaurado",
+    toastScanDone: "🔍 Escaneo completo",
+    toastScriptSaved: "✓ Script guardado",
+    toastScriptDeleted: "Script eliminado",
+    toastPicker: "🎯 Haz clic en un elemento…",
+    toastPickerDone: "✓ Elemento oculto",
+    toastPickerCancelled: "Selección cancelada",
+    toastCantOpen: "No disponible en esta página",
+    toastNoDefaults: "Sin valores por defecto",
+    toastIncognito: "Permite incógnito en ajustes de extensión",
+    confirmFactoryTitle: "Restablecimiento",
+    confirmFactoryMsg: "¿Eliminar scripts y restaurar ajustes de fábrica?",
+    confirmDeleteTitle: "Eliminar script",
+    confirmDeleteMsg: "Esta acción es irreversible.",
+    confirmYes: "Confirmar",
+    confirmCancel: "Cancelar",
+    closeEditor: "Cerrar",
+    restoreOne: "Restaurar",
+    unnamedScript: "Sin nombre",
+    unknownElement: "(desconocido)",
+    emptyCode: "Código vacío",
+    readError: "Error de lectura",
+    overlayX: n => `${n} overlay${n > 1 ? "s" : ""} oculto${n > 1 ? "s" : ""}`,
+    ago: s => s < 60 ? `hace ${s}s` : `hace ${Math.floor(s / 60)}min`
   },
-  de:{
-    active:'Aktiv', inactive:'Inaktiv',
-    enableAll:'Alle aktivieren', disableAll:'Alle deaktivieren',
-    picker:'Auswahl', cancelPicker:'Abbrechen',
-    tabProtections:'Schutz', tabOverlays:'Overlays',
-    tabScripts:'Skripte', tabSettings:'Einstellungen',
-    groupMouse:'Maus & Auswahl', groupClipboard:'Zwischenablage & Tastatur',
-    groupBehavior:'Seitenverhalten', groupDisplay:'Anzeige', groupAdvanced:'Erweitert', groupTools:'Schnelltools',
-    presetsLabel:'Voreinstellungen:',
-    presetReading:'Lesen', presetReadingDesc:'Optimiert zum Lesen von Artikeln und Umgehen von Paywalls',
-    presetStealth:'Tarnung', presetStealthDesc:'Minimaler Fußabdruck: schützt die Privatsphäre, ohne das Seitenverhalten zu ändern',
-    presetBalanced:'Ausgewogen', presetBalancedDesc:'Empfohlene Standardeinstellungen',
-    presetVideo:'Video', presetVideoDesc:'Für Streaming gedacht: Player bleibt sichtbar, Scrollen und Klicks entsperrt',
-    hintReadingText:'Diese Seite sieht nach einem Artikel oder gesperrtem Inhalt (Paywall) aus',
-    hintVideoText:'Diese Seite sieht nach einem Video-Player aus',
-    hintApply:'Ausprobieren', hintDismiss:'Vorschlag ausblenden',
+  de: {
+    active: "Aktiv",
+    inactive: "Inaktiv",
+    enableAll: "Alle aktivieren",
+    disableAll: "Alle deaktivieren",
+    picker: "Auswahl",
+    cancelPicker: "Abbrechen",
+    tabProtections: "Schutz",
+    tabOverlays: "Overlays",
+    tabScripts: "Skripte",
+    tabSettings: "Einstellungen",
+    groupMouse: "Maus & Auswahl",
+    groupClipboard: "Zwischenablage & Tastatur",
+    groupBehavior: "Seitenverhalten",
+    groupDisplay: "Anzeige",
+    groupAdvanced: "Erweitert",
+    groupTools: "Schnelltools",
+    presetsLabel: "Voreinstellungen:",
+    presetReading: "Lesen",
+    presetReadingDesc: "Optimiert zum Lesen von Artikeln und Umgehen von Paywalls",
+    presetStealth: "Tarnung",
+    presetStealthDesc: "Minimaler Fußabdruck: schützt die Privatsphäre, ohne das Seitenverhalten zu ändern",
+    presetBalanced: "Ausgewogen",
+    presetBalancedDesc: "Empfohlene Standardeinstellungen",
+    presetVideo: "Video",
+    presetVideoDesc: "Für Streaming gedacht: Player bleibt sichtbar, Scrollen und Klicks entsperrt",
+    hintReadingText: "Diese Seite sieht nach einem Artikel oder gesperrtem Inhalt (Paywall) aus",
+    hintVideoText: "Diese Seite sieht nach einem Video-Player aus",
+    hintApply: "Ausprobieren",
+    hintDismiss: "Vorschlag ausblenden",
     toastPresetApplied: label => `✓ Voreinstellung „${label}" angewendet`,
-    groupToggleAll:'Gesamte Gruppe umschalten',
-    fContextmenu:'Rechtsklick', dContextmenu:'Reaktiviert das native Kontextmenü',
-    fSelectstart:'Textauswahl', dSelectstart:'Ermöglicht Markieren und Kopieren auf blockierenden Seiten',
-    fCursor:'Mauszeiger', dCursor:'Erzwingt die Anzeige des Mauszeigers',
-    fPointerEvents:'Klicks auf Overlays', dPointerEvents:'Macht Inhalte unter Popup-Fenstern anklickbar',
-    fClipboard:'Kopieren / Ausschneiden / Einfügen', dClipboard:'Aktiviert Strg+C, Strg+X, Strg+V auf blockierenden Seiten',
-    fKeyboard:'Tastaturkürzel', dKeyboard:'Verhindert das Abfangen von Kürzeln durch Seiten',
-    fFocus:'Anti-Fokusraub', dFocus:'Verhindert automatische Fokusumlenkungen',
-    fDragdrop:'Drag & Drop', dDragdrop:'Stellt Drag&Drop für Bilder, Dateien und Links wieder her',
-    fScroll:'Scrollen', dScroll:'Entsperrt Scrollen wenn eine Seite es blockiert',
-    fPrint:'Drucken', dPrint:'Ermöglicht Drucken oder PDF-Speicherung',
-    fVisibility:'Immer sichtbar', dVisibility:'Lässt die Seite glauben Sie seien immer auf diesem Tab',
-    fZoom:'Zoom', dZoom:'Entsperrt Pinch-to-Zoom wenn eine Seite es deaktiviert',
-    fDarkMode:'Erzwungener Dunkelmodus', dDarkMode:'Wendet ein dunkles Design auf jede Seite an, auch ohne native Unterstützung',
-    fOverlays:'Auto-Overlay-Entfernung', dOverlays:'Erkennt und versteckt automatisch blockierende Fenster',
-    fDevtools:'DevTools verbergen', dDevtools:'Verhindert dass die Seite F12 erkennt',
-    fConsole:'Konsolenschutz', dConsole:'Verhindert dass die Seite Konsolenmeldungen löscht',
-    experimental:'Experimentell',
-    toolSource:'Quellcode', toolCopyUrl:'URL kopieren', toolIncognito:'Privat',
-    overlayNone:'Keine Overlays ausgeblendet', restoreAll:'Alle wiederherstellen', scanNow:'Seite scannen',
-    overlayEmptyMsg:'Keine Overlays ausgeblendet.', overlayEmptyHint:'Auto-Entfernung aktivieren oder Auswahl-Button nutzen.',
-    overlayAuto:'Auto', overlayManual:'Manuell',
-    newScript:'Neues Skript', examplesLabel:'Beispiele:',
-    scriptNamePlaceholder:'Skriptname…', defaultScriptName:'Skript',
-    codePlaceholder:"// Dein JavaScript hier\n// Vollständiger Zugriff auf den Seitenkontext\n// Beispiel: document.title = 'Mein Titel';",
-    snippetAds:'Werbung entf.', snippetForceEn:'EN erzwingen', snippetShowImgs:'Bilder zeigen', snippetAntiPaywall:'Anti-Paywall',
-    snippetAdsCode:"// Werbung entfernen\ndocument.querySelectorAll('[class*=\"ad\"],[id*=\"ad\"],[class*=\"pub\"]').forEach(el => el.remove());",
-    snippetForceEnCode:"// Englische Sprache erzwingen\ndocument.documentElement.lang = 'en';",
-    snippetShowImgsCode:"// Alle Bilder sichtbar machen\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
-    snippetAntiPaywallCode:"// Paywalls entfernen\ndocument.querySelectorAll('[class*=\"paywall\"],[class*=\"wall\"],[class*=\"gate\"]').forEach(el => el.remove());\ndocument.body.style.overflow = 'auto';",
-    themeToggle:'Theme wechseln',
-    scriptEmptyMsg:'Keine benutzerdefinierten Skripte.', scriptEmptyHint:'Erstelle JS-Skripte die automatisch auf jeder Seite laufen.',
-    runAtLabel:'Ausführungszeitpunkt:',
-    matchLabel:'Auf eine Seite beschränken (optional):',
-    matchPlaceholder:'beispiel.de oder *.beispiel.de',
-    runStart:'Beim Start — vor dem Seiteninhalt',
-    runEnd:'DOM bereit',
-    runIdle:'Vollständig geladen',
-    deleteScript:'Löschen', saveScript:'Speichern',
-    settingLanguage:'Sprache / Language', settingTheme:'Erscheinungsbild',
-    themeDark:'Dunkel', themeLight:'Hell',
-    siteToggleTitle:'Aktiv auf dieser Seite', toastSiteExcluded:'✓ Auf dieser Seite deaktiviert', toastSiteIncluded:'✓ Auf dieser Seite reaktiviert',
-    settingExcluded:'Ausgeschlossene Seiten',
-    settingExcludedDesc:'Deaktiviere Overpass über die Leiste oben im Popup; die Seite erscheint dann hier.',
-    excludedEmptyMsg:'Keine ausgeschlossenen Seiten.', removeSite:'Entfernen',
-    excludedAddPlaceholder:'beispiel.de oder *.beispiel.de', addSite:'Hinzufügen',
-    toastSiteAdded:'✓ Seite zu Ausschlüssen hinzugefügt', toastInvalidSite:'Ungültige Seitenadresse',
-    settingProfiles:'Seitenprofile',
-    settingProfilesDesc:'Eine Seite kann ihre eigene Kombination von Schutzfunktionen haben, abweichend von der globalen Einstellung — speichere sie über das Symbol in der Leiste oben im Popup.',
-    profilesEmptyMsg:'Keine Seitenprofile gespeichert.',
-    siteProfileSaveTitle:'Aktuelle Einstellungen für diese Seite speichern',
-    siteProfileUpdateTitle:'Profil auf dieser Seite aktiv — klicken, um es zu aktualisieren',
-    confirmSaveProfileTitle:'Dieses Seitenprofil speichern?',
-    confirmUpdateProfileTitle:'Dieses Seitenprofil aktualisieren?',
+    groupToggleAll: "Gesamte Gruppe umschalten",
+    fContextmenu: "Rechtsklick",
+    dContextmenu: "Reaktiviert das native Kontextmenü",
+    fSelectstart: "Textauswahl",
+    dSelectstart: "Ermöglicht Markieren und Kopieren auf blockierenden Seiten",
+    fCursor: "Mauszeiger",
+    dCursor: "Erzwingt die Anzeige des Mauszeigers",
+    fPointerEvents: "Klicks auf Overlays",
+    dPointerEvents: "Macht Inhalte unter Popup-Fenstern anklickbar",
+    fClipboard: "Kopieren / Ausschneiden / Einfügen",
+    dClipboard: "Aktiviert Strg+C, Strg+X, Strg+V auf blockierenden Seiten",
+    fKeyboard: "Tastaturkürzel",
+    dKeyboard: "Verhindert das Abfangen von Kürzeln durch Seiten",
+    fFocus: "Anti-Fokusraub",
+    dFocus: "Verhindert automatische Fokusumlenkungen",
+    fDragdrop: "Drag & Drop",
+    dDragdrop: "Stellt Drag&Drop für Bilder, Dateien und Links wieder her",
+    fScroll: "Scrollen",
+    dScroll: "Entsperrt Scrollen wenn eine Seite es blockiert",
+    fPrint: "Drucken",
+    dPrint: "Ermöglicht Drucken oder PDF-Speicherung",
+    fVisibility: "Immer sichtbar",
+    dVisibility: "Lässt die Seite glauben Sie seien immer auf diesem Tab",
+    fZoom: "Zoom",
+    dZoom: "Entsperrt Pinch-to-Zoom wenn eine Seite es deaktiviert",
+    fDarkMode: "Erzwungener Dunkelmodus",
+    dDarkMode: "Wendet ein dunkles Design auf jede Seite an, auch ohne native Unterstützung",
+    fOverlays: "Auto-Overlay-Entfernung",
+    dOverlays: "Erkennt und versteckt automatisch blockierende Fenster",
+    fDevtools: "DevTools verbergen",
+    dDevtools: "Verhindert dass die Seite F12 erkennt",
+    fConsole: "Konsolenschutz",
+    dConsole: "Verhindert dass die Seite Konsolenmeldungen löscht",
+    experimental: "Experimentell",
+    toolSource: "Quellcode",
+    toolCopyUrl: "URL kopieren",
+    toolIncognito: "Privat",
+    overlayNone: "Keine Overlays ausgeblendet",
+    restoreAll: "Alle wiederherstellen",
+    scanNow: "Seite scannen",
+    overlayEmptyMsg: "Keine Overlays ausgeblendet.",
+    overlayEmptyHint: "Auto-Entfernung aktivieren oder Auswahl-Button nutzen.",
+    overlayAuto: "Auto",
+    overlayManual: "Manuell",
+    newScript: "Neues Skript",
+    examplesLabel: "Beispiele:",
+    scriptNamePlaceholder: "Skriptname…",
+    defaultScriptName: "Skript",
+    codePlaceholder: "// Dein JavaScript hier\n// Vollständiger Zugriff auf den Seitenkontext\n// Beispiel: document.title = 'Mein Titel';",
+    snippetAds: "Werbung entf.",
+    snippetForceEn: "EN erzwingen",
+    snippetShowImgs: "Bilder zeigen",
+    snippetAntiPaywall: "Anti-Paywall",
+    snippetAdsCode: '// Werbung entfernen\ndocument.querySelectorAll(\'[class*="ad"],[id*="ad"],[class*="pub"]\').forEach(el => el.remove());',
+    snippetForceEnCode: "// Englische Sprache erzwingen\ndocument.documentElement.lang = 'en';",
+    snippetShowImgsCode: "// Alle Bilder sichtbar machen\ndocument.querySelectorAll('img').forEach(img => {\n  img.style.display = 'block';\n  img.style.visibility = 'visible';\n});",
+    snippetAntiPaywallCode: '// Paywalls entfernen\ndocument.querySelectorAll(\'[class*="paywall"],[class*="wall"],[class*="gate"]\').forEach(el => el.remove());\ndocument.body.style.overflow = \'auto\';',
+    themeToggle: "Theme wechseln",
+    scriptEmptyMsg: "Keine benutzerdefinierten Skripte.",
+    scriptEmptyHint: "Erstelle JS-Skripte die automatisch auf jeder Seite laufen.",
+    runAtLabel: "Ausführungszeitpunkt:",
+    matchLabel: "Auf eine Seite beschränken (optional):",
+    matchPlaceholder: "beispiel.de oder *.beispiel.de",
+    runStart: "Beim Start — vor dem Seiteninhalt",
+    runEnd: "DOM bereit",
+    runIdle: "Vollständig geladen",
+    deleteScript: "Löschen",
+    saveScript: "Speichern",
+    settingLanguage: "Sprache / Language",
+    settingTheme: "Erscheinungsbild",
+    themeDark: "Dunkel",
+    themeLight: "Hell",
+    siteToggleTitle: "Aktiv auf dieser Seite",
+    toastSiteExcluded: "✓ Auf dieser Seite deaktiviert",
+    toastSiteIncluded: "✓ Auf dieser Seite reaktiviert",
+    settingExcluded: "Ausgeschlossene Seiten",
+    settingExcludedDesc: "Deaktiviere Overpass über die Leiste oben im Popup; die Seite erscheint dann hier.",
+    excludedEmptyMsg: "Keine ausgeschlossenen Seiten.",
+    removeSite: "Entfernen",
+    excludedAddPlaceholder: "beispiel.de oder *.beispiel.de",
+    addSite: "Hinzufügen",
+    toastSiteAdded: "✓ Seite zu Ausschlüssen hinzugefügt",
+    toastInvalidSite: "Ungültige Seitenadresse",
+    settingProfiles: "Seitenprofile",
+    settingProfilesDesc: "Eine Seite kann ihre eigene Kombination von Schutzfunktionen haben, abweichend von der globalen Einstellung — speichere sie über das Symbol in der Leiste oben im Popup.",
+    profilesEmptyMsg: "Keine Seitenprofile gespeichert.",
+    siteProfileSaveTitle: "Aktuelle Einstellungen für diese Seite speichern",
+    siteProfileUpdateTitle: "Profil auf dieser Seite aktiv — klicken, um es zu aktualisieren",
+    confirmSaveProfileTitle: "Dieses Seitenprofil speichern?",
+    confirmUpdateProfileTitle: "Dieses Seitenprofil aktualisieren?",
     confirmProfileMsg: host => `Die aktuellen Einstellungen werden als Profil für „${host}" gespeichert und gelten nur auf dieser Seite, anstelle der globalen Einstellung.`,
-    toastProfileSaved:'✓ Seitenprofil gespeichert',
-    settingDefaults:'Standardeinstellungen',
-    settingDefaultsDesc:'Aktuelle Konfiguration speichern um sie einfach wiederherzustellen.',
-    saveDefaults:'Als Standard speichern', loadDefaults:'Meine Standards laden',
-    settingBackup:'Sicherung',
-    settingBackupDesc:'Exportiere alle deine Einstellungen (Schutzfunktionen, Skripte, ausgeschlossene Seiten) in eine Datei oder stelle eine frühere Sicherung wieder her.',
-    exportSettings:'Exportieren', importSettings:'Importieren',
-    toastExportDone:'✓ Sicherung heruntergeladen', toastImportDone:'✓ Einstellungen importiert', toastImportError:'Ungültige oder unlesbare Datei',
-    confirmImportTitle:'Diese Sicherung importieren?',
-    importSummary: (sc, si, sp) => `Diese Sicherung enthält ${sc} benutzerdefiniertes Skript${sc>1?'e':''}, ${si} ausgeschlossene Seite${si>1?'n':''} und ${sp} Seitenprofil${sp>1?'e':''}. Deine aktuellen Einstellungen werden ersetzt. Fortfahren?`,
-    settingNetworkBlocking:'Netzwerk-Blockierung',
-    settingNetworkBlockingDesc:'Blockiert auf Netzwerkebene eine Liste bekannter Skripte, deren einziger Zweck darin besteht, Inhaltsblocker zu erkennen und auszuhebeln. Eine Startliste, die mit der Zeit wachsen soll.',
-    networkBlockingToggle:'Blockierung aktivieren',
-    toastNetworkBlockingOn:'✓ Netzwerk-Blockierung aktiviert', toastNetworkBlockingOff:'Netzwerk-Blockierung deaktiviert',
-    settingSupport:'Support',
-    updateUpToDate:'Aktuell', updateChecking:'Wird geprüft…', updateCheckFailed:'Prüfung fehlgeschlagen',
-    toastStorageQuotaExceeded:'⚠ Zu groß zum Speichern — verkleinere deine Skripte',
-    updateNoReleases:'Noch keine Version veröffentlicht',
+    toastProfileSaved: "✓ Seitenprofil gespeichert",
+    settingDefaults: "Standardeinstellungen",
+    settingDefaultsDesc: "Aktuelle Konfiguration speichern um sie einfach wiederherzustellen.",
+    saveDefaults: "Als Standard speichern",
+    loadDefaults: "Meine Standards laden",
+    settingBackup: "Sicherung",
+    settingBackupDesc: "Exportiere alle deine Einstellungen (Schutzfunktionen, Skripte, ausgeschlossene Seiten) in eine Datei oder stelle eine frühere Sicherung wieder her.",
+    exportSettings: "Exportieren",
+    importSettings: "Importieren",
+    toastExportDone: "✓ Sicherung heruntergeladen",
+    toastImportDone: "✓ Einstellungen importiert",
+    toastImportError: "Ungültige oder unlesbare Datei",
+    confirmImportTitle: "Diese Sicherung importieren?",
+    importSummary: (sc, si, sp) => `Diese Sicherung enthält ${sc} benutzerdefiniertes Skript${sc > 1 ? "e" : ""}, ${si} ausgeschlossene Seite${si > 1 ? "n" : ""} und ${sp} Seitenprofil${sp > 1 ? "e" : ""}. Deine aktuellen Einstellungen werden ersetzt. Fortfahren?`,
+    settingNetworkBlocking: "Netzwerk-Blockierung",
+    settingNetworkBlockingDesc: "Blockiert auf Netzwerkebene eine Liste bekannter Skripte, deren einziger Zweck darin besteht, Inhaltsblocker zu erkennen und auszuhebeln. Eine Startliste, die mit der Zeit wachsen soll.",
+    networkBlockingToggle: "Blockierung aktivieren",
+    toastNetworkBlockingOn: "✓ Netzwerk-Blockierung aktiviert",
+    toastNetworkBlockingOff: "Netzwerk-Blockierung deaktiviert",
+    settingSupport: "Support",
+    updateUpToDate: "Aktuell",
+    updateChecking: "Wird geprüft…",
+    updateCheckFailed: "Prüfung fehlgeschlagen",
+    toastStorageQuotaExceeded: "⚠ Zu groß zum Speichern — verkleinere deine Skripte",
+    updateNoReleases: "Noch keine Version veröffentlicht",
     updateAvailable: v => `Version ${v} verfügbar`,
-    checkUpdate:'Prüfen', goToRelease:'Aktualisieren',
-    toastUpdateAvailable: v => `✓ Version ${v} verfügbar!`, toastUpdateNone:'Du bist bereits auf dem neuesten Stand',
-    updateDotTitle:'Update verfügbar — klicken für mehr Infos',
-    settingReportDesc:'Funktioniert ein Bypass nicht wie erwartet? Melde es, damit wir die Erweiterung verbessern können.',
-    reportIssue:'Problem melden',
-    reportSiteTitle:'Problem auf dieser Seite melden',
-    settingFactory:'Zurücksetzen',
-    settingFactoryDesc:'Alles zurücksetzen: löscht Skripte und stellt Originaleinstellungen wieder her.',
-    factoryReset:'Werkseinstellungen',
-    settingAbout:'Über', aboutEngine:'Engine', aboutCompat:'Kompatibilität',
-    aboutShortcuts:'Tastenkürzel', aboutShortcutsTitle:'Klicken zum Kopieren — in die Adressleiste einfügen',
-    toastShortcutsCopied:'✓ Pfad kopiert, in die Adressleiste einfügen',
-    footerSync:'Tabs synchronisiert',
-    toastEnabled:'✓ Alles aktiviert!', toastDisabled:'Alles deaktiviert',
-    toastDefaultsSaved:'✓ Standards gespeichert', toastDefaultsLoaded:'✓ Standards geladen',
-    toastFactoryDone:'✓ Zurückgesetzt', toastUrlCopied:'✓ URL kopiert',
-    toastOverlayRestored:'✓ Overlay wiederhergestellt', toastAllRestored:'✓ Alle wiederhergestellt', toastScanDone:'🔍 Scan abgeschlossen',
-    toastScriptSaved:'✓ Skript gespeichert', toastScriptDeleted:'Skript gelöscht',
-    toastPicker:'🎯 Element anklicken…', toastPickerDone:'✓ Element ausgeblendet',
-    toastPickerCancelled:'Auswahl abgebrochen', toastCantOpen:'Auf dieser Seite nicht verfügbar',
-    toastNoDefaults:'Noch keine Standards gespeichert',
-    toastIncognito:'Inkognito in Erweiterungseinstellungen erlauben',
-    confirmFactoryTitle:'Zurücksetzen',
-    confirmFactoryMsg:'Alle Skripte löschen und Werkseinstellungen wiederherstellen?',
-    confirmDeleteTitle:'Skript löschen',
-    confirmDeleteMsg:'Diese Aktion ist nicht rückgängig zu machen.',
-    confirmYes:'Bestätigen', confirmCancel:'Abbrechen',
-    closeEditor:'Schließen', restoreOne:'Wiederherstellen',
-    unnamedScript:'Unbenannt', unknownElement:'(unbekannt)',
-    emptyCode:'Code leer', readError:'Lesefehler',
-    overlayX: n => `${n} Overlay${n>1?'s':''} ausgeblendet`,
-    ago: s => s < 60 ? `vor ${s}s` : `vor ${Math.floor(s/60)}min`,
-  },
+    checkUpdate: "Prüfen",
+    goToRelease: "Aktualisieren",
+    toastUpdateAvailable: v => `✓ Version ${v} verfügbar!`,
+    toastUpdateNone: "Du bist bereits auf dem neuesten Stand",
+    updateDotTitle: "Update verfügbar — klicken für mehr Infos",
+    settingReportDesc: "Funktioniert ein Bypass nicht wie erwartet? Melde es, damit wir die Erweiterung verbessern können.",
+    reportIssue: "Problem melden",
+    reportSiteTitle: "Problem auf dieser Seite melden",
+    settingFactory: "Zurücksetzen",
+    settingFactoryDesc: "Alles zurücksetzen: löscht Skripte und stellt Originaleinstellungen wieder her.",
+    factoryReset: "Werkseinstellungen",
+    settingAbout: "Über",
+    aboutEngine: "Engine",
+    aboutCompat: "Kompatibilität",
+    aboutShortcuts: "Tastenkürzel",
+    aboutShortcutsTitle: "Klicken zum Kopieren — in die Adressleiste einfügen",
+    toastShortcutsCopied: "✓ Pfad kopiert, in die Adressleiste einfügen",
+    footerSync: "Tabs synchronisiert",
+    toastEnabled: "✓ Alles aktiviert!",
+    toastDisabled: "Alles deaktiviert",
+    toastDefaultsSaved: "✓ Standards gespeichert",
+    toastDefaultsLoaded: "✓ Standards geladen",
+    toastFactoryDone: "✓ Zurückgesetzt",
+    toastUrlCopied: "✓ URL kopiert",
+    toastOverlayRestored: "✓ Overlay wiederhergestellt",
+    toastAllRestored: "✓ Alle wiederhergestellt",
+    toastScanDone: "🔍 Scan abgeschlossen",
+    toastScriptSaved: "✓ Skript gespeichert",
+    toastScriptDeleted: "Skript gelöscht",
+    toastPicker: "🎯 Element anklicken…",
+    toastPickerDone: "✓ Element ausgeblendet",
+    toastPickerCancelled: "Auswahl abgebrochen",
+    toastCantOpen: "Auf dieser Seite nicht verfügbar",
+    toastNoDefaults: "Noch keine Standards gespeichert",
+    toastIncognito: "Inkognito in Erweiterungseinstellungen erlauben",
+    confirmFactoryTitle: "Zurücksetzen",
+    confirmFactoryMsg: "Alle Skripte löschen und Werkseinstellungen wiederherstellen?",
+    confirmDeleteTitle: "Skript löschen",
+    confirmDeleteMsg: "Diese Aktion ist nicht rückgängig zu machen.",
+    confirmYes: "Bestätigen",
+    confirmCancel: "Abbrechen",
+    closeEditor: "Schließen",
+    restoreOne: "Wiederherstellen",
+    unnamedScript: "Unbenannt",
+    unknownElement: "(unbekannt)",
+    emptyCode: "Code leer",
+    readError: "Lesefehler",
+    overlayX: n => `${n} Overlay${n > 1 ? "s" : ""} ausgeblendet`,
+    ago: s => s < 60 ? `vor ${s}s` : `vor ${Math.floor(s / 60)}min`
+  }
 };
 
-// ════════════════════════════════════════════════════════════════
-// CONSTANTS
-// ════════════════════════════════════════════════════════════════
-const VERSION = '4.0.1';
+const VERSION = "4.0.2";
 
 const FEATURE_GROUPS = {
-  mouse   : ['contextmenu','selectstart','cursor','pointerEvents'],
-  keyboard: ['clipboard','keyboard','focus'],
-  behavior: ['dragdrop','scroll','print','visibility','overlays','zoom'],
-  display : ['darkMode'],
-  advanced: ['devtools','consoleProtect'],
+  mouse: [ "contextmenu", "selectstart", "cursor", "pointerEvents" ],
+  keyboard: [ "clipboard", "keyboard", "focus" ],
+  behavior: [ "dragdrop", "scroll", "print", "visibility", "overlays", "zoom" ],
+  display: [ "darkMode" ],
+  advanced: [ "devtools", "consoleProtect" ]
 };
 
 const FACTORY_DEFAULTS = {
-  contextmenu:true, selectstart:true, clipboard:true, keyboard:true,
-  dragdrop:true, scroll:false, cursor:true, pointerEvents:false,
-  print:true, overlays:false, devtools:false, consoleProtect:false,
-  focus:false, visibility:true, zoom:true, darkMode:false,
+  contextmenu: true,
+  selectstart: true,
+  clipboard: true,
+  keyboard: true,
+  dragdrop: true,
+  scroll: false,
+  cursor: true,
+  pointerEvents: false,
+  print: true,
+  overlays: false,
+  devtools: false,
+  consoleProtect: false,
+  focus: false,
+  visibility: true,
+  zoom: true,
+  darkMode: false
 };
 
-// Préréglages rapides : chacun couvre explicitement les mêmes clés que
-// FACTORY_DEFAULTS, pour que leur application soit un état déterministe
-// complet — jamais une fusion partielle avec les réglages précédents.
 const PRESETS = {
   reading: {
-    contextmenu:true, selectstart:true, clipboard:true, keyboard:true,
-    dragdrop:false, scroll:true, cursor:true, pointerEvents:true,
-    print:true, overlays:true, devtools:false, consoleProtect:false,
-    focus:false, visibility:false, zoom:true, darkMode:false,
+    contextmenu: true,
+    selectstart: true,
+    clipboard: true,
+    keyboard: true,
+    dragdrop: false,
+    scroll: true,
+    cursor: true,
+    pointerEvents: true,
+    print: true,
+    overlays: true,
+    devtools: false,
+    consoleProtect: false,
+    focus: false,
+    visibility: false,
+    zoom: true,
+    darkMode: false
   },
   stealth: {
-    contextmenu:false, selectstart:false, clipboard:false, keyboard:false,
-    dragdrop:false, scroll:false, cursor:false, pointerEvents:false,
-    print:false, overlays:false, devtools:true, consoleProtect:true,
-    focus:false, visibility:true, zoom:false, darkMode:false,
+    contextmenu: false,
+    selectstart: false,
+    clipboard: false,
+    keyboard: false,
+    dragdrop: false,
+    scroll: false,
+    cursor: false,
+    pointerEvents: false,
+    print: false,
+    overlays: false,
+    devtools: true,
+    consoleProtect: true,
+    focus: false,
+    visibility: true,
+    zoom: false,
+    darkMode: false
   },
   balanced: {
-    contextmenu:true, selectstart:true, clipboard:true, keyboard:true,
-    dragdrop:true,    scroll:false, cursor:true, pointerEvents:false,
-    print:true,  overlays:false, devtools:false, consoleProtect:false,
-    focus:false, visibility:true, zoom:true, darkMode:false,
+    contextmenu: true,
+    selectstart: true,
+    clipboard: true,
+    keyboard: true,
+    dragdrop: true,
+    scroll: false,
+    cursor: true,
+    pointerEvents: false,
+    print: true,
+    overlays: false,
+    devtools: false,
+    consoleProtect: false,
+    focus: false,
+    visibility: true,
+    zoom: true,
+    darkMode: false
   },
   video: {
-    contextmenu:true, selectstart:false, clipboard:false, keyboard:true,
-    dragdrop:false, scroll:true, cursor:true, pointerEvents:true,
-    print:false, overlays:true, devtools:false, consoleProtect:false,
-    focus:false, visibility:true, zoom:true, darkMode:false,
-  },
+    contextmenu: true,
+    selectstart: false,
+    clipboard: false,
+    keyboard: true,
+    dragdrop: false,
+    scroll: true,
+    cursor: true,
+    pointerEvents: true,
+    print: false,
+    overlays: true,
+    devtools: false,
+    consoleProtect: false,
+    focus: false,
+    visibility: true,
+    zoom: true,
+    darkMode: false
+  }
 };
 
-// ════════════════════════════════════════════════════════════════
-// STATE
-// ════════════════════════════════════════════════════════════════
-let cfg      = { ...FACTORY_DEFAULTS, customScripts: [] };
-let lang     = 'fr';
-let theme    = 'dark';
-let tabId    = null;
-let pickerOn = false;
-let editingScriptId  = null;
-let toastTimer       = null;
-let excludedSites    = [];
-let siteProfiles     = {};
-let currentHostname  = '';
-let updateInfo       = null;
-let hintDismissed     = false; // n'affiche plus la suggestion une fois ignorée, pour cette ouverture du popup
+let cfg = {
+  ...FACTORY_DEFAULTS,
+  customScripts: []
+};
 
-// ════════════════════════════════════════════════════════════════
-// HELPERS
-// ════════════════════════════════════════════════════════════════
+let lang = "fr";
+
+let theme = "dark";
+
+let tabId = null;
+
+let pickerOn = false;
+
+let editingScriptId = null;
+
+let toastTimer = null;
+
+let excludedSites = [];
+
+let siteProfiles = {};
+
+let currentHostname = "";
+
+let updateInfo = null;
+
+let hintDismissed = false;
+
 function t(key, ...args) {
   const tr = I18N[lang] || I18N.fr;
-  const v  = tr[key] ?? I18N.fr[key] ?? key;
-  return typeof v === 'function' ? v(...args) : v;
+  const v = tr[key] ?? I18N.fr[key] ?? key;
+  return typeof v === "function" ? v(...args) : v;
 }
 
-
-// Crée un élément texte (safe, pas d'innerHTML)
-function setText(el, text) { if (el) el.textContent = String(text); }
+function setText(el, text) {
+  if (el) el.textContent = String(text);
+}
 
 function syncing(on) {
-  document.getElementById('syncDot')?.classList.toggle('syncing', on);
+  document.getElementById("syncDot")?.classList.toggle("syncing", on);
 }
 
 function getHostname(url) {
-  try { return new URL(url).hostname || ''; } catch (_) { return ''; }
+  try {
+    return new URL(url).hostname || "";
+  } catch (_) {
+    return "";
+  }
 }
 
-// Même sémantique que hostMatchesPattern() côté content.js/background.js :
-// "exemple.com" (exact) ou "*.exemple.com" (domaine + sous-domaines) — les
-// sites exclus et les profils de site supportent tous deux ce motif.
 function hostMatchesPattern(host, pattern) {
-  if (!host || typeof pattern !== 'string') return false;
+  if (!host || typeof pattern !== "string") return false;
   const p = pattern.trim().toLowerCase();
   if (!p) return false;
   const h = host.toLowerCase();
-  if (p.startsWith('*.')) {
+  if (p.startsWith("*.")) {
     const base = p.slice(2);
-    return !!base && (h === base || h.endsWith('.' + base));
+    return !!base && (h === base || h.endsWith("." + base));
   }
   return h === p;
 }
@@ -617,12 +963,12 @@ function hostInList(host, list) {
 }
 
 function findSiteProfile(host, profiles) {
-  if (!host || !profiles || typeof profiles !== 'object') return null;
+  if (!host || !profiles || typeof profiles !== "object") return null;
   if (profiles[host]) return profiles[host];
   let best = null, bestLen = -1;
   Object.keys(profiles).forEach(key => {
     const p = key.trim().toLowerCase();
-    if (!p.startsWith('*.')) return;
+    if (!p.startsWith("*.")) return;
     const base = p.slice(2);
     if (base && hostMatchesPattern(host, key) && base.length > bestLen) {
       best = profiles[key];
@@ -632,69 +978,68 @@ function findSiteProfile(host, profiles) {
   return best;
 }
 
-// ════════════════════════════════════════════════════════════════
-// SITE BAR — exclusion d'Overpass sur le site de l'onglet actif
 function updateSiteBar() {
-  const bar = document.getElementById('siteBar');
-  const inp = document.getElementById('siteActiveToggle');
-  const domainEl = document.getElementById('siteDomain');
-  const saveBtn = document.getElementById('btnSaveSiteProfile');
+  const bar = document.getElementById("siteBar");
+  const inp = document.getElementById("siteActiveToggle");
+  const domainEl = document.getElementById("siteDomain");
+  const saveBtn = document.getElementById("btnSaveSiteProfile");
   if (!bar || !inp || !domainEl || !currentHostname) return;
   const excluded = hostInList(currentHostname, excludedSites);
   inp.checked = !excluded;
-  bar.classList.toggle('excluded', excluded);
+  bar.classList.toggle("excluded", excluded);
   domainEl.textContent = currentHostname;
   domainEl.title = currentHostname;
   if (saveBtn) {
     const hasProfile = !!findSiteProfile(currentHostname, siteProfiles);
-    saveBtn.classList.toggle('has-profile', hasProfile);
-    saveBtn.title = t(hasProfile ? 'siteProfileUpdateTitle' : 'siteProfileSaveTitle');
+    saveBtn.classList.toggle("has-profile", hasProfile);
+    saveBtn.title = t(hasProfile ? "siteProfileUpdateTitle" : "siteProfileSaveTitle");
   }
 }
 
 async function setSiteExcluded(excluded) {
   if (!currentHostname) return;
-  // Réactiver le site doit garantir qu'il redevient actif : on retire donc
-  // toute entrée qui le concerne, exacte ou wildcard (ex: une règle
-  // "*.exemple.com" ajoutée depuis les Paramètres). Exclure ajoute
-  // uniquement le hostname exact, sans jamais promouvoir en wildcard.
-  const next = excluded
-    ? [...new Set([...excludedSites, currentHostname])]
-    : excludedSites.filter(entry => !hostMatchesPattern(currentHostname, entry));
-  const ok = await syncSet({ excludedSites: next });
+  const next = excluded ? [ ...new Set([ ...excludedSites, currentHostname ]) ] : excludedSites.filter(entry => !hostMatchesPattern(currentHostname, entry));
+  const ok = await syncSet({
+    excludedSites: next
+  });
   if (!ok) return;
   excludedSites = next;
   updateSiteBar();
   renderExcludedList();
-  toast(t(excluded ? 'toastSiteExcluded' : 'toastSiteIncluded'), excluded ? 'info' : 'ok');
+  toast(t(excluded ? "toastSiteExcluded" : "toastSiteIncluded"), excluded ? "info" : "ok");
 }
 
-// ════════════════════════════════════════════════════════════════
-// SITE PROFILES — combinaison de protections propre à un site
-// ════════════════════════════════════════════════════════════════
 async function saveSiteProfile() {
   if (!currentHostname) return;
   const existing = siteProfiles[currentHostname];
-  const confirmed = await showConfirm(
-    existing ? 'confirmUpdateProfileTitle' : 'confirmSaveProfileTitle',
-    null, t('confirmProfileMsg', currentHostname)
-  );
+  const confirmed = await showConfirm(existing ? "confirmUpdateProfileTitle" : "confirmSaveProfileTitle", null, t("confirmProfileMsg", currentHostname));
   if (!confirmed) return;
   const snap = {};
-  Object.keys(FACTORY_DEFAULTS).forEach(k => { snap[k] = !!cfg[k]; });
-  const next = { ...siteProfiles, [currentHostname]: snap };
-  const ok = await syncSet({ siteProfiles: next });
+  Object.keys(FACTORY_DEFAULTS).forEach(k => {
+    snap[k] = !!cfg[k];
+  });
+  const next = {
+    ...siteProfiles,
+    [currentHostname]: snap
+  };
+  const ok = await syncSet({
+    siteProfiles: next
+  });
   if (!ok) return;
   siteProfiles = next;
   updateSiteBar();
   renderProfilesList();
-  toast(t('toastProfileSaved'));
+  toast(t("toastProfileSaved"));
 }
 
 async function removeSiteProfile(host) {
-  const next = { ...siteProfiles };
+  const next = {
+    ...siteProfiles
+  };
   delete next[host];
-  const ok = await syncSet({ siteProfiles: next });
+  const ok = await syncSet({
+    siteProfiles: next
+  });
   if (!ok) return;
   siteProfiles = next;
   renderProfilesList();
@@ -702,31 +1047,28 @@ async function removeSiteProfile(host) {
 }
 
 function renderProfilesList() {
-  const container = document.getElementById('profilesList');
-  const empty = document.getElementById('profilesEmpty');
+  const container = document.getElementById("profilesList");
+  const empty = document.getElementById("profilesEmpty");
   if (!container) return;
   const hosts = Object.keys(siteProfiles).sort();
-  container.innerHTML = '';
+  container.innerHTML = "";
   if (hosts.length === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) empty.style.display = "";
     return;
   }
-  if (empty) empty.style.display = 'none';
+  if (empty) empty.style.display = "none";
   hosts.forEach(host => {
     const count = Object.keys(siteProfiles[host] || {}).length;
-    const item = document.createElement('div');
-    item.className = 'excluded-item';
-
-    const span = document.createElement('span');
-    span.textContent = `${host} · ${count}`; // textContent = safe
+    const item = document.createElement("div");
+    item.className = "excluded-item";
+    const span = document.createElement("span");
+    span.textContent = `${host} · ${count}`;
     span.title = host;
-
-    const btn = document.createElement('button');
-    btn.className = 'excluded-remove';
-    btn.title = t('removeSite');
+    const btn = document.createElement("button");
+    btn.className = "excluded-remove";
+    btn.title = t("removeSite");
     btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-    btn.addEventListener('click', () => removeSiteProfile(host));
-
+    btn.addEventListener("click", () => removeSiteProfile(host));
     item.appendChild(span);
     item.appendChild(btn);
     container.appendChild(item);
@@ -734,136 +1076,136 @@ function renderProfilesList() {
 }
 
 function initSiteBar() {
-  const bar = document.getElementById('siteBar');
-  const inp = document.getElementById('siteActiveToggle');
+  const bar = document.getElementById("siteBar");
+  const inp = document.getElementById("siteActiveToggle");
   if (!bar || !inp) return;
-  if (!currentHostname) { bar.style.display = 'none'; return; }
-  bar.style.display = 'flex';
-  inp.addEventListener('change', () => setSiteExcluded(!inp.checked));
-  document.getElementById('btnSaveSiteProfile')?.addEventListener('click', saveSiteProfile);
-  document.getElementById('btnReportSite')?.addEventListener('click', reportSite);
+  if (!currentHostname) {
+    bar.style.display = "none";
+    return;
+  }
+  bar.style.display = "flex";
+  inp.addEventListener("change", () => setSiteExcluded(!inp.checked));
+  document.getElementById("btnSaveSiteProfile")?.addEventListener("click", saveSiteProfile);
+  document.getElementById("btnReportSite")?.addEventListener("click", reportSite);
 }
 
 function renderExcludedList() {
-  const container = document.getElementById('excludedList');
-  const empty = document.getElementById('excludedEmpty');
+  const container = document.getElementById("excludedList");
+  const empty = document.getElementById("excludedEmpty");
   if (!container) return;
-  container.innerHTML = '';
+  container.innerHTML = "";
   if (excludedSites.length === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) empty.style.display = "";
     return;
   }
-  if (empty) empty.style.display = 'none';
-  [...excludedSites].sort().forEach(host => {
-    const item = document.createElement('div');
-    item.className = 'excluded-item';
-
-    const span = document.createElement('span');
-    span.textContent = host; // textContent = safe
+  if (empty) empty.style.display = "none";
+  [ ...excludedSites ].sort().forEach(host => {
+    const item = document.createElement("div");
+    item.className = "excluded-item";
+    const span = document.createElement("span");
+    span.textContent = host;
     span.title = host;
-
-    const btn = document.createElement('button');
-    btn.className = 'excluded-remove';
-    btn.title = t('removeSite');
+    const btn = document.createElement("button");
+    btn.className = "excluded-remove";
+    btn.title = t("removeSite");
     btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-    btn.addEventListener('click', async () => {
+    btn.addEventListener("click", async () => {
       const next = excludedSites.filter(h => h !== host);
-      const ok = await syncSet({ excludedSites: next });
+      const ok = await syncSet({
+        excludedSites: next
+      });
       if (!ok) return;
       excludedSites = next;
       renderExcludedList();
       updateSiteBar();
     });
-
     item.appendChild(span);
     item.appendChild(btn);
     container.appendChild(item);
   });
 }
 
-// Normalise une entrée de site tapée manuellement : accepte un préfixe
-// wildcard "*.", retire protocole/chemin/port collés par erreur — même
-// nettoyage que le champ "Restreindre à un site" des scripts personnalisés,
-// pour que la syntaxe reste cohérente dans toute l'extension.
 function normalizeSitePattern(raw) {
-  let val = (raw || '').trim().toLowerCase();
-  const isWildcard = val.startsWith('*.');
+  let val = (raw || "").trim().toLowerCase();
+  const isWildcard = val.startsWith("*.");
   let host = isWildcard ? val.slice(2) : val;
-  host = host.replace(/^[a-z]+:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
-  return (isWildcard ? `*.${host}` : host);
+  host = host.replace(/^[a-z]+:\/\//, "").replace(/\/.*$/, "").replace(/:\d+$/, "");
+  return isWildcard ? `*.${host}` : host;
 }
 
 async function addExcludedSite() {
-  const inp = document.getElementById('excludedAddInput');
+  const inp = document.getElementById("excludedAddInput");
   if (!inp) return;
   const pattern = normalizeSitePattern(inp.value);
-  const bareHost = pattern.startsWith('*.') ? pattern.slice(2) : pattern;
-  if (!bareHost || !bareHost.includes('.')) { toast(t('toastInvalidSite'), 'err'); return; }
-  if (excludedSites.some(e => e.toLowerCase() === pattern)) { inp.value = ''; return; }
-  const next = [...excludedSites, pattern];
-  const ok = await syncSet({ excludedSites: next });
+  const bareHost = pattern.startsWith("*.") ? pattern.slice(2) : pattern;
+  if (!bareHost || !bareHost.includes(".")) {
+    toast(t("toastInvalidSite"), "err");
+    return;
+  }
+  if (excludedSites.some(e => e.toLowerCase() === pattern)) {
+    inp.value = "";
+    return;
+  }
+  const next = [ ...excludedSites, pattern ];
+  const ok = await syncSet({
+    excludedSites: next
+  });
   if (!ok) return;
   excludedSites = next;
-  inp.value = '';
+  inp.value = "";
   renderExcludedList();
   updateSiteBar();
-  toast(t('toastSiteAdded'));
+  toast(t("toastSiteAdded"));
 }
 
 function initExcludedSitesInput() {
-  const inp = document.getElementById('excludedAddInput');
-  document.getElementById('btnAddExcluded')?.addEventListener('click', addExcludedSite);
-  inp?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); addExcludedSite(); }
+  const inp = document.getElementById("excludedAddInput");
+  document.getElementById("btnAddExcluded")?.addEventListener("click", addExcludedSite);
+  inp?.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addExcludedSite();
+    }
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// TOAST
-// ════════════════════════════════════════════════════════════════
-function toast(msg, type = 'ok', ms = 1900) {
-  const el = document.getElementById('toast');
+function toast(msg, type = "ok", ms = 1900) {
+  const el = document.getElementById("toast");
   if (!el) return;
   el.textContent = String(msg);
   el.className = `toast ${type} show`;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+  toastTimer = setTimeout(() => el.classList.remove("show"), ms);
 }
 
-// ════════════════════════════════════════════════════════════════
-// CONFIRM MODAL (sécurisé : textContent uniquement)
-// ════════════════════════════════════════════════════════════════
 function showConfirm(titleKey, msgKey, rawMsg = null) {
   return new Promise(resolve => {
-    const bd = document.getElementById('modalBackdrop');
-    if (!bd) { resolve(false); return; }
-    setText(document.getElementById('confirmTitle'), t(titleKey));
-    setText(document.getElementById('confirmMsg'),   rawMsg ?? t(msgKey));
-    setText(document.getElementById('confirmYes'),   t('confirmYes'));
-    setText(document.getElementById('confirmNo'),    t('confirmCancel'));
-    bd.style.display = 'flex';
-    const cleanup = ok => { bd.style.display = 'none'; resolve(ok); };
-    document.getElementById('confirmYes').onclick = () => cleanup(true);
-    document.getElementById('confirmNo').onclick  = () => cleanup(false);
+    const bd = document.getElementById("modalBackdrop");
+    if (!bd) {
+      resolve(false);
+      return;
+    }
+    setText(document.getElementById("confirmTitle"), t(titleKey));
+    setText(document.getElementById("confirmMsg"), rawMsg ?? t(msgKey));
+    setText(document.getElementById("confirmYes"), t("confirmYes"));
+    setText(document.getElementById("confirmNo"), t("confirmCancel"));
+    bd.style.display = "flex";
+    const cleanup = ok => {
+      bd.style.display = "none";
+      resolve(ok);
+    };
+    document.getElementById("confirmYes").onclick = () => cleanup(true);
+    document.getElementById("confirmNo").onclick = () => cleanup(false);
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// SEND TO CONTENT SCRIPT
-// ════════════════════════════════════════════════════════════════
-// Écrit dans chrome.storage.sync et signale honnêtement un dépassement de
-// quota (item >8Ko, ou trop d'écritures/minute) au lieu de laisser
-// l'appelant croire que la sauvegarde a réussi. Retourne true/false pour
-// que l'appelant ne mette à jour son état local qu'après un succès réel —
-// sinon la variable en mémoire du popup se désynchronise silencieusement
-// du storage jusqu'à sa prochaine réouverture.
 async function syncSet(obj) {
   try {
     await chrome.storage.sync.set(obj);
     return true;
   } catch (err) {
-    if (/quota/i.test(err?.message || '')) {
-      toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+    if (/quota/i.test(err?.message || "")) {
+      toast(t("toastStorageQuotaExceeded"), "err", 4e3);
     }
     return false;
   }
@@ -872,104 +1214,86 @@ async function syncSet(obj) {
 async function send(action, extra = {}) {
   if (!tabId) return;
   try {
-    await chrome.tabs.sendMessage(tabId, { action, ...extra });
-  } catch (_) {
-    // Tab introuvable ou content script non injecté (chrome://, about:, etc.)
-  }
+    await chrome.tabs.sendMessage(tabId, {
+      action: action,
+      ...extra
+    });
+  } catch (_) {}
 }
 
-// ════════════════════════════════════════════════════════════════
-// APPLY SETTINGS
-//
-// IMPORTANT : on envoie le message d'application à la page AVANT
-// d'écrire dans chrome.storage.sync. chrome.storage.sync peut être
-// lent (synchro réseau, quotas de débit) — l'attendre avant d'agir
-// sur la page donnait l'impression qu'un toggle ne prenait effet
-// qu'après un rechargement manuel. La page est maintenant mise à
-// jour immédiatement ; la persistance se fait en arrière-plan.
-// ════════════════════════════════════════════════════════════════
 async function applySettings(patch) {
-  // Valider que patch ne contient que des clés autorisées
   const safe = {};
-  const allowed = new Set([...Object.keys(FACTORY_DEFAULTS), 'customScripts']);
-  Object.keys(patch).forEach(k => { if (allowed.has(k)) safe[k] = patch[k]; });
-  cfg = { ...cfg, ...safe };
-
+  const allowed = new Set([ ...Object.keys(FACTORY_DEFAULTS), "customScripts" ]);
+  Object.keys(patch).forEach(k => {
+    if (allowed.has(k)) safe[k] = patch[k];
+  });
+  cfg = {
+    ...cfg,
+    ...safe
+  };
   updateUI();
-  send('updateSettings', { settings: cfg }); // application immédiate, non bloquante
-
+  send("updateSettings", {
+    settings: cfg
+  });
   syncing(true);
   try {
-    // storage.sync.set fait un merge partiel (les clés non fournies restent
-    // inchangées) : on n'écrit donc que les clés réellement modifiées par ce
-    // patch, au lieu de l'intégralité de cfg — ce qui évite de réécrire la
-    // chaîne JSON des scripts personnalisés à chaque simple bascule de case.
-    const toStore = { ...safe };
-    if ('customScripts' in toStore) toStore.customScripts = JSON.stringify(toStore.customScripts);
+    const toStore = {
+      ...safe
+    };
+    if ("customScripts" in toStore) toStore.customScripts = JSON.stringify(toStore.customScripts);
     await chrome.storage.sync.set(toStore);
   } catch (err) {
-    // Un dépassement de quota (chrome.storage.sync limite chaque élément à
-    // 8 Ko — facilement atteint avec plusieurs scripts personnalisés,
-    // notamment après un import) doit être signalé : sans ça, l'utilisateur
-    // croit que son changement est enregistré alors qu'il ne survivra pas
-    // au redémarrage du navigateur. Les autres échecs (réseau, etc.) restent
-    // silencieux — la page a déjà le bon état, seule la persistance cross-
-    // appareil est affectée, et retenter à chaque toggle serait trop bruyant.
-    if (/quota/i.test(err?.message || '')) {
-      toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+    if (/quota/i.test(err?.message || "")) {
+      toast(t("toastStorageQuotaExceeded"), "err", 4e3);
     }
   }
   setTimeout(() => syncing(false), 500);
 }
 
-// ════════════════════════════════════════════════════════════════
-// i18n APPLICATION
-// ════════════════════════════════════════════════════════════════
 function applyI18n() {
-  document.querySelectorAll('[data-i18n]').forEach(el => {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
     const key = el.dataset.i18n;
     el.textContent = t(key);
   });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder));
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    el.setAttribute("placeholder", t(el.dataset.i18nPlaceholder));
   });
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    el.setAttribute('title', t(el.dataset.i18nTitle));
+  document.querySelectorAll("[data-i18n-title]").forEach(el => {
+    el.setAttribute("title", t(el.dataset.i18nTitle));
   });
-  document.querySelectorAll('input[data-group-toggle]').forEach(inp => {
-    inp.closest('.toggle')?.setAttribute('title', t('groupToggleAll'));
+  document.querySelectorAll("input[data-group-toggle]").forEach(inp => {
+    inp.closest(".toggle")?.setAttribute("title", t("groupToggleAll"));
   });
-  document.getElementById('btnCloseEditor')?.setAttribute('aria-label', t('closeEditor'));
-  document.getElementById('siteToggleWrap')?.setAttribute('title', t('siteToggleTitle'));
-  document.querySelectorAll('.lang-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.lang === lang);
+  document.getElementById("btnCloseEditor")?.setAttribute("aria-label", t("closeEditor"));
+  document.getElementById("siteToggleWrap")?.setAttribute("title", t("siteToggleTitle"));
+  document.querySelectorAll(".lang-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.lang === lang);
   });
-  document.querySelectorAll('.theme-pick').forEach(b => {
-    b.classList.toggle('active', b.dataset.theme === theme);
+  document.querySelectorAll(".theme-pick").forEach(b => {
+    b.classList.toggle("active", b.dataset.theme === theme);
   });
-  document.getElementById('iconMoon').style.display = theme === 'dark'  ? '' : 'none';
-  document.getElementById('iconSun').style.display  = theme === 'light' ? '' : 'none';
+  document.getElementById("iconMoon").style.display = theme === "dark" ? "" : "none";
+  document.getElementById("iconSun").style.display = theme === "light" ? "" : "none";
   updatePickerBtn();
 }
 
-// ════════════════════════════════════════════════════════════════
-// UI UPDATE
-// ════════════════════════════════════════════════════════════════
 function updateUI() {
-  // Toggles
-  document.querySelectorAll('input[data-key]').forEach(inp => {
+  document.querySelectorAll("input[data-key]").forEach(inp => {
     if (inp.dataset.key in cfg) inp.checked = !!cfg[inp.dataset.key];
   });
-
-  // Compteurs de groupes + bascule groupée (checked = tout actif,
-  // indeterminate = partiellement actif)
-  const countMap = { mouse:'cnt-mouse', keyboard:'cnt-keyboard', behavior:'cnt-behavior', display:'cnt-display', advanced:'cnt-advanced' };
+  const countMap = {
+    mouse: "cnt-mouse",
+    keyboard: "cnt-keyboard",
+    behavior: "cnt-behavior",
+    display: "cnt-display",
+    advanced: "cnt-advanced"
+  };
   Object.entries(FEATURE_GROUPS).forEach(([g, keys]) => {
     const el = document.getElementById(countMap[g]);
     const active = keys.filter(k => cfg[k]).length;
     if (el) {
       el.textContent = `${active}/${keys.length}`;
-      el.classList.toggle('all-on', active === keys.length);
+      el.classList.toggle("all-on", active === keys.length);
     }
     const grpToggle = document.querySelector(`input[data-group-toggle="${g}"]`);
     if (grpToggle) {
@@ -977,302 +1301,277 @@ function updateUI() {
       grpToggle.indeterminate = active > 0 && active < keys.length;
     }
   });
-
-  // Status badge
   const anyOn = Object.keys(FACTORY_DEFAULTS).some(k => cfg[k]);
-  const badge  = document.getElementById('statusBadge');
-  badge?.classList.toggle('inactive', !anyOn);
-  const stText = badge?.querySelector('.status-text');
-  if (stText) stText.textContent = anyOn ? t('active') : t('inactive');
-
+  const badge = document.getElementById("statusBadge");
+  badge?.classList.toggle("inactive", !anyOn);
+  const stText = badge?.querySelector(".status-text");
+  if (stText) stText.textContent = anyOn ? t("active") : t("inactive");
   updatePresetHighlight();
-
-  // Badge scripts
   const sc = cfg.customScripts?.length || 0;
-  const sb = document.getElementById('scriptsBadge');
-  if (sb) { sb.style.display = sc > 0 ? '' : 'none'; sb.textContent = sc; }
-
-  // Le scan manuel n'a d'effet que si le masquage auto des overlays est actif
-  const scanBtn = document.getElementById('btnScanOverlays');
-  if (scanBtn) scanBtn.style.display = cfg.overlays ? '' : 'none';
-
+  const sb = document.getElementById("scriptsBadge");
+  if (sb) {
+    sb.style.display = sc > 0 ? "" : "none";
+    sb.textContent = sc;
+  }
+  const scanBtn = document.getElementById("btnScanOverlays");
+  if (scanBtn) scanBtn.style.display = cfg.overlays ? "" : "none";
   renderScriptList();
 }
 
-// ════════════════════════════════════════════════════════════════
-// TABS
-// ════════════════════════════════════════════════════════════════
 function switchToTab(tabName) {
-  document.querySelectorAll('.tab, .panel').forEach(el => el.classList.remove('active'));
-  document.querySelector(`.tab[data-tab="${tabName}"]`)?.classList.add('active');
-  document.getElementById(`panel-${tabName}`)?.classList.add('active');
+  document.querySelectorAll(".tab, .panel").forEach(el => el.classList.remove("active"));
+  document.querySelector(`.tab[data-tab="${tabName}"]`)?.classList.add("active");
+  document.getElementById(`panel-${tabName}`)?.classList.add("active");
 }
 
 function initTabs() {
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => switchToTab(tab.dataset.tab));
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => switchToTab(tab.dataset.tab));
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// TOGGLES
-// ════════════════════════════════════════════════════════════════
 function initToggles() {
-  document.querySelectorAll('input[data-key]').forEach(inp => {
-    inp.addEventListener('change', () => {
-      applySettings({ [inp.dataset.key]: inp.checked });
+  document.querySelectorAll("input[data-key]").forEach(inp => {
+    inp.addEventListener("change", () => {
+      applySettings({
+        [inp.dataset.key]: inp.checked
+      });
     });
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// GROUP TOGGLES (bascule groupée — active/désactive toutes les
-// fonctionnalités d'une catégorie en un clic)
-// ════════════════════════════════════════════════════════════════
 function initGroupToggles() {
-  document.querySelectorAll('input[data-group-toggle]').forEach(inp => {
-    inp.addEventListener('change', () => {
+  document.querySelectorAll("input[data-group-toggle]").forEach(inp => {
+    inp.addEventListener("change", () => {
       const keys = FEATURE_GROUPS[inp.dataset.groupToggle] || [];
       const patch = {};
-      keys.forEach(k => { patch[k] = inp.checked; });
+      keys.forEach(k => {
+        patch[k] = inp.checked;
+      });
       applySettings(patch);
     });
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// QUICK PRESETS
-// ════════════════════════════════════════════════════════════════
-const PRESET_IDS = { reading: 'presetReading', stealth: 'presetStealth', balanced: 'presetBalanced', video: 'presetVideo' };
+const PRESET_IDS = {
+  reading: "presetReading",
+  stealth: "presetStealth",
+  balanced: "presetBalanced",
+  video: "presetVideo"
+};
 
 function initPresets() {
   Object.entries(PRESET_IDS).forEach(([key, id]) => {
-    document.getElementById(id)?.addEventListener('click', () => applyPreset(key));
+    document.getElementById(id)?.addEventListener("click", () => applyPreset(key));
   });
 }
 
 function applyPreset(key) {
   const preset = PRESETS[key];
   if (!preset) return;
-  applySettings({ ...preset });
-  toast(t('toastPresetApplied', t(PRESET_IDS[key])));
+  applySettings({
+    ...preset
+  });
+  toast(t("toastPresetApplied", t(PRESET_IDS[key])));
 }
 
-// Renvoie la clé du préréglage qui correspond exactement à cfg, ou null si
-// la combinaison actuelle ne correspond à aucun préréglage connu — sert
-// uniquement à mettre en surbrillance le bouton actif, jamais utilisé pour
-// modifier l'état.
 function matchingPreset() {
-  return Object.keys(PRESETS).find(key =>
-    Object.keys(FACTORY_DEFAULTS).every(k => !!cfg[k] === !!PRESETS[key][k])
-  ) || null;
+  return Object.keys(PRESETS).find(key => Object.keys(FACTORY_DEFAULTS).every(k => !!cfg[k] === !!PRESETS[key][k])) || null;
 }
 
 function updatePresetHighlight() {
   const active = matchingPreset();
   Object.entries(PRESET_IDS).forEach(([key, id]) => {
-    document.getElementById(id)?.classList.toggle('active', key === active);
+    document.getElementById(id)?.classList.toggle("active", key === active);
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// SUGGESTION DE PRÉRÉGLAGE — basée sur un signal détecté par inject.js
-// (type de contenu de la page), reçu en pièce jointe de la réponse
-// 'getState'. Jamais appliqué automatiquement : uniquement une bannière
-// que l'utilisateur peut appliquer ou ignorer d'un clic, cohérent avec le
-// principe général de l'extension (rien n'est modifié sans action
-// explicite). Recalculée à chaque ouverture du popup, jamais en continu.
-// ════════════════════════════════════════════════════════════════
-const HINT_TO_PRESET = { reading: 'reading', video: 'video' };
+const HINT_TO_PRESET = {
+  reading: "reading",
+  video: "video"
+};
 
 function evaluateContentHint(hint) {
-  const banner = document.getElementById('presetHint');
+  const banner = document.getElementById("presetHint");
   if (!banner) return;
   const presetKey = HINT_TO_PRESET[hint];
-  // Rien à suggérer si : pas de signal, déjà ignoré cette session, site
-  // exclu (aucune protection ne s'applique de toute façon), ou le
-  // préréglage suggéré est déjà celui actif.
   if (!presetKey || hintDismissed || hostInList(currentHostname, excludedSites) || matchingPreset() === presetKey) {
-    banner.style.display = 'none';
+    banner.style.display = "none";
     return;
   }
-  const textEl = document.getElementById('presetHintText');
-  if (textEl) textEl.textContent = t(hint === 'video' ? 'hintVideoText' : 'hintReadingText');
-  banner.style.display = 'flex';
+  const textEl = document.getElementById("presetHintText");
+  if (textEl) textEl.textContent = t(hint === "video" ? "hintVideoText" : "hintReadingText");
+  banner.style.display = "flex";
   banner.dataset.presetKey = presetKey;
 }
 
 function initPresetHint() {
-  document.getElementById('btnApplyHint')?.addEventListener('click', () => {
-    const banner = document.getElementById('presetHint');
+  document.getElementById("btnApplyHint")?.addEventListener("click", () => {
+    const banner = document.getElementById("presetHint");
     const key = banner?.dataset.presetKey;
     if (key) applyPreset(key);
-    if (banner) banner.style.display = 'none';
+    if (banner) banner.style.display = "none";
   });
-  document.getElementById('btnDismissHint')?.addEventListener('click', () => {
+  document.getElementById("btnDismissHint")?.addEventListener("click", () => {
     hintDismissed = true;
-    const banner = document.getElementById('presetHint');
-    if (banner) banner.style.display = 'none';
+    const banner = document.getElementById("presetHint");
+    if (banner) banner.style.display = "none";
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// PICKER
-// ════════════════════════════════════════════════════════════════
 function updatePickerBtn() {
-  const btn = document.getElementById('btnPickOverlay');
-  const lbl = document.getElementById('btnPickerLabel');
+  const btn = document.getElementById("btnPickOverlay");
+  const lbl = document.getElementById("btnPickerLabel");
   if (!btn || !lbl) return;
   if (pickerOn) {
-    btn.classList.add('picking');
-    lbl.textContent = t('cancelPicker');
+    btn.classList.add("picking");
+    lbl.textContent = t("cancelPicker");
   } else {
-    btn.classList.remove('picking');
-    lbl.textContent = t('picker');
+    btn.classList.remove("picking");
+    lbl.textContent = t("picker");
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// QUICK ACTIONS
-// ════════════════════════════════════════════════════════════════
 function initQuickActions() {
-  document.getElementById('btnOverpass')?.addEventListener('click', () => {
+  document.getElementById("btnOverpass")?.addEventListener("click", () => {
     const all = {};
     Object.keys(FACTORY_DEFAULTS).forEach(k => all[k] = true);
     applySettings(all);
-    toast(t('toastEnabled'));
+    toast(t("toastEnabled"));
   });
-
-  document.getElementById('btnLockAll')?.addEventListener('click', () => {
+  document.getElementById("btnLockAll")?.addEventListener("click", () => {
     const none = {};
     Object.keys(FACTORY_DEFAULTS).forEach(k => none[k] = false);
     applySettings(none);
-    toast(t('toastDisabled'), 'info');
+    toast(t("toastDisabled"), "info");
   });
-
-  document.getElementById('btnPickOverlay')?.addEventListener('click', async () => {
+  document.getElementById("btnPickOverlay")?.addEventListener("click", async () => {
     if (pickerOn) {
       pickerOn = false;
       updatePickerBtn();
-      await send('cancelPicker');
-      toast(t('toastPickerCancelled'), 'info');
+      await send("cancelPicker");
+      toast(t("toastPickerCancelled"), "info");
     } else {
-      // Vérifier qu'on est sur une page normale (pas chrome://)
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.url || tab.url.startsWith('chrome') || tab.url.startsWith('about')) {
-        toast(t('toastCantOpen'), 'err');
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
+      });
+      if (!tab?.url || tab.url.startsWith("chrome") || tab.url.startsWith("about")) {
+        toast(t("toastCantOpen"), "err");
         return;
       }
       pickerOn = true;
       updatePickerBtn();
-      toast(t('toastPicker'), 'info', 10000);
-      await send('activatePicker');
+      toast(t("toastPicker"), "info", 1e4);
+      await send("activatePicker");
     }
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// QUICK TOOLS
-// ════════════════════════════════════════════════════════════════
 function initTools() {
-  document.getElementById('btnViewSource')?.addEventListener('click', async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.url && !tab.url.startsWith('chrome') && !tab.url.startsWith('about')) {
-      chrome.tabs.create({ url: 'view-source:' + tab.url });
+  document.getElementById("btnViewSource")?.addEventListener("click", async () => {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true
+    });
+    if (tab?.url && !tab.url.startsWith("chrome") && !tab.url.startsWith("about")) {
+      chrome.tabs.create({
+        url: "view-source:" + tab.url
+      });
     } else {
-      toast(t('toastCantOpen'), 'err');
+      toast(t("toastCantOpen"), "err");
     }
   });
-
-  document.getElementById('btnCopyUrl')?.addEventListener('click', async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  document.getElementById("btnCopyUrl")?.addEventListener("click", async () => {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true
+    });
     if (tab?.url) {
-      try { await navigator.clipboard.writeText(tab.url); toast(t('toastUrlCopied')); } catch (_) {}
+      try {
+        await navigator.clipboard.writeText(tab.url);
+        toast(t("toastUrlCopied"));
+      } catch (_) {}
     }
   });
-
-  document.getElementById('btnIncognito')?.addEventListener('click', async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  document.getElementById("btnIncognito")?.addEventListener("click", async () => {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true
+    });
     if (!tab?.url) return;
-    chrome.windows.create({ url: tab.url, incognito: true }, () => {
-      if (chrome.runtime.lastError) toast(t('toastIncognito'), 'err', 3000);
+    chrome.windows.create({
+      url: tab.url,
+      incognito: true
+    }, () => {
+      if (chrome.runtime.lastError) toast(t("toastIncognito"), "err", 3e3);
     });
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// OVERLAY PANEL
-// ════════════════════════════════════════════════════════════════
 function initOverlayPanel() {
-  document.getElementById('btnRestoreAll')?.addEventListener('click', async () => {
-    await send('restoreAllOverlays');
-    toast(t('toastAllRestored'));
+  document.getElementById("btnRestoreAll")?.addEventListener("click", async () => {
+    await send("restoreAllOverlays");
+    toast(t("toastAllRestored"));
   });
-  document.getElementById('btnScanOverlays')?.addEventListener('click', async () => {
-    await send('removeOverlays');
-    toast(t('toastScanDone'), 'info');
+  document.getElementById("btnScanOverlays")?.addEventListener("click", async () => {
+    await send("removeOverlays");
+    toast(t("toastScanDone"), "info");
   });
 }
 
 function renderOverlayList(list) {
-  // Validation : s'assurer que list est un tableau d'objets attendus
   if (!Array.isArray(list)) list = [];
-  const safe = list.filter(o => o && typeof o === 'object' && typeof o.id === 'string');
-
-  const cnt   = safe.length;
-  const badge = document.getElementById('overlayBadge');
-  if (badge) { badge.style.display = cnt > 0 ? '' : 'none'; badge.textContent = cnt; }
-
-  const countEl = document.getElementById('overlayCount');
-  if (countEl) countEl.textContent = cnt > 0 ? t('overlayX', cnt) : t('overlayNone');
-
-  const restoreBtn = document.getElementById('btnRestoreAll');
-  if (restoreBtn) restoreBtn.style.display = cnt > 0 ? '' : 'none';
-
-  const container = document.getElementById('overlayList');
-  const empty     = document.getElementById('overlayEmpty');
+  const safe = list.filter(o => o && typeof o === "object" && typeof o.id === "string");
+  const cnt = safe.length;
+  const badge = document.getElementById("overlayBadge");
+  if (badge) {
+    badge.style.display = cnt > 0 ? "" : "none";
+    badge.textContent = cnt;
+  }
+  const countEl = document.getElementById("overlayCount");
+  if (countEl) countEl.textContent = cnt > 0 ? t("overlayX", cnt) : t("overlayNone");
+  const restoreBtn = document.getElementById("btnRestoreAll");
+  if (restoreBtn) restoreBtn.style.display = cnt > 0 ? "" : "none";
+  const container = document.getElementById("overlayList");
+  const empty = document.getElementById("overlayEmpty");
   if (!container) return;
-
   if (cnt === 0) {
-    container.innerHTML = '';
+    container.innerHTML = "";
     if (empty) container.appendChild(empty);
-    if (empty) empty.style.display = '';
+    if (empty) empty.style.display = "";
     return;
   }
-  if (empty) empty.style.display = 'none';
-  container.innerHTML = '';
-
+  if (empty) empty.style.display = "none";
+  container.innerHTML = "";
   safe.forEach(ov => {
-    const ago = Math.floor((Date.now() - (ov.ts || 0)) / 1000);
-    const item = document.createElement('div');
-    item.className = `overlay-item ${ov.auto ? 'auto-item' : 'manual-item'}`;
-
-    // Icône (SVG statique, pas de données utilisateur)
-    const icon = document.createElement('div');
-    icon.className = 'overlay-icon';
+    const ago = Math.floor((Date.now() - (ov.ts || 0)) / 1e3);
+    const item = document.createElement("div");
+    item.className = `overlay-item ${ov.auto ? "auto-item" : "manual-item"}`;
+    const icon = document.createElement("div");
+    icon.className = "overlay-icon";
     icon.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-
-    const info = document.createElement('div');
-    info.className = 'overlay-info';
-    const desc = document.createElement('div');
-    desc.className = 'overlay-desc';
-    desc.title = ov.desc || '';
-    desc.textContent = ov.desc || t('unknownElement'); // textContent = safe
-    const meta = document.createElement('div');
-    meta.className = 'overlay-meta';
-    meta.textContent = `${ov.auto ? t('overlayAuto') : t('overlayManual')} · ${t('ago', ago)}`;
+    const info = document.createElement("div");
+    info.className = "overlay-info";
+    const desc = document.createElement("div");
+    desc.className = "overlay-desc";
+    desc.title = ov.desc || "";
+    desc.textContent = ov.desc || t("unknownElement");
+    const meta = document.createElement("div");
+    meta.className = "overlay-meta";
+    meta.textContent = `${ov.auto ? t("overlayAuto") : t("overlayManual")} · ${t("ago", ago)}`;
     info.appendChild(desc);
     info.appendChild(meta);
-
-    const btn = document.createElement('button');
-    btn.className = 'restore-btn';
-    btn.title = t('restoreOne');
+    const btn = document.createElement("button");
+    btn.className = "restore-btn";
+    btn.title = t("restoreOne");
     btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 15a9 9 0 1 0 .49-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    btn.addEventListener('click', async () => {
-      await send('restoreOverlay', { id: ov.id });
-      toast(t('toastOverlayRestored'));
+    btn.addEventListener("click", async () => {
+      await send("restoreOverlay", {
+        id: ov.id
+      });
+      toast(t("toastOverlayRestored"));
     });
-
     item.appendChild(icon);
     item.appendChild(info);
     item.appendChild(btn);
@@ -1280,67 +1579,62 @@ function renderOverlayList(list) {
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// SCRIPT EDITOR
-// ════════════════════════════════════════════════════════════════
 function renderScriptList() {
-  const scripts   = cfg.customScripts || [];
-  const container = document.getElementById('scriptList');
-  const empty     = document.getElementById('scriptEmpty');
+  const scripts = cfg.customScripts || [];
+  const container = document.getElementById("scriptList");
+  const empty = document.getElementById("scriptEmpty");
   if (!container) return;
-
   if (scripts.length === 0) {
-    container.innerHTML = '';
-    if (empty) { container.appendChild(empty); empty.style.display = ''; }
+    container.innerHTML = "";
+    if (empty) {
+      container.appendChild(empty);
+      empty.style.display = "";
+    }
     return;
   }
-  if (empty) empty.style.display = 'none';
-  container.innerHTML = '';
-
+  if (empty) empty.style.display = "none";
+  container.innerHTML = "";
   scripts.forEach(sc => {
-    const lines = (sc.code || '').split('\n').length;
-    const item  = document.createElement('div');
-    item.className = 'script-item';
-
-    const icon = document.createElement('div');
-    icon.className = 'script-icon';
+    const lines = (sc.code || "").split("\n").length;
+    const item = document.createElement("div");
+    item.className = "script-item";
+    const icon = document.createElement("div");
+    icon.className = "script-icon";
     icon.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polyline points="16 18 22 12 16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="8 6 2 12 8 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-
-    const info = document.createElement('div');
-    info.className = 'script-info';
-    const name = document.createElement('div');
-    name.className = 'script-name';
-    name.textContent = sc.name || t('unnamedScript'); // textContent = safe
-    const meta = document.createElement('div');
-    meta.className = 'script-meta';
-    const matchSuffix = sc.match ? ` · ${sc.match}` : '';
-    meta.textContent = `${sc.runAt || ''} · ${lines} ligne${lines > 1 ? 's' : ''}${matchSuffix}`;
+    const info = document.createElement("div");
+    info.className = "script-info";
+    const name = document.createElement("div");
+    name.className = "script-name";
+    name.textContent = sc.name || t("unnamedScript");
+    const meta = document.createElement("div");
+    meta.className = "script-meta";
+    const matchSuffix = sc.match ? ` · ${sc.match}` : "";
+    meta.textContent = `${sc.runAt || ""} · ${lines} ligne${lines > 1 ? "s" : ""}${matchSuffix}`;
     info.appendChild(name);
     info.appendChild(meta);
-
-    // Toggle enable/disable
-    const toggleWrap = document.createElement('label');
-    toggleWrap.className = 'toggle';
-    const inp = document.createElement('input');
-    inp.type = 'checkbox';
+    const toggleWrap = document.createElement("label");
+    toggleWrap.className = "toggle";
+    const inp = document.createElement("input");
+    inp.type = "checkbox";
     inp.checked = !!sc.enabled;
-    inp.addEventListener('change', e => {
+    inp.addEventListener("change", e => {
       e.stopPropagation();
-      const updated = cfg.customScripts.map(s =>
-        s.id === sc.id ? { ...s, enabled: inp.checked } : s
-      );
-      applySettings({ customScripts: updated });
+      const updated = cfg.customScripts.map(s => s.id === sc.id ? {
+        ...s,
+        enabled: inp.checked
+      } : s);
+      applySettings({
+        customScripts: updated
+      });
     });
-    const sliderSpan = document.createElement('span');
-    sliderSpan.className = 'slider';
+    const sliderSpan = document.createElement("span");
+    sliderSpan.className = "slider";
     toggleWrap.appendChild(inp);
     toggleWrap.appendChild(sliderSpan);
-
-    item.addEventListener('click', e => {
-      if (e.target.closest('label')) return;
+    item.addEventListener("click", e => {
+      if (e.target.closest("label")) return;
       openScriptEditor(sc.id);
     });
-
     item.appendChild(icon);
     item.appendChild(info);
     item.appendChild(toggleWrap);
@@ -1351,526 +1645,550 @@ function renderScriptList() {
 function openScriptEditor(id = null) {
   editingScriptId = id;
   const sc = id ? cfg.customScripts.find(s => s.id === id) : null;
-
-  const nameEl   = document.getElementById('editorName');
-  const codeEl   = document.getElementById('editorCode');
-  const runAtEl  = document.getElementById('editorRunAt');
-  const matchEl  = document.getElementById('editorMatch');
-  const delBtn   = document.getElementById('btnDeleteScript');
-  const editorEl = document.getElementById('scriptEditor');
-
-  if (nameEl)   nameEl.value   = sc?.name   || '';
-  if (codeEl)   codeEl.value   = sc?.code   || '';
-  if (runAtEl)  runAtEl.value  = sc?.runAt  || 'document_idle';
-  if (matchEl)  matchEl.value  = sc?.match  || '';
-  if (delBtn)   delBtn.style.display = id ? '' : 'none';
-  if (editorEl) { editorEl.style.display = ''; nameEl?.focus(); }
+  const nameEl = document.getElementById("editorName");
+  const codeEl = document.getElementById("editorCode");
+  const runAtEl = document.getElementById("editorRunAt");
+  const matchEl = document.getElementById("editorMatch");
+  const delBtn = document.getElementById("btnDeleteScript");
+  const editorEl = document.getElementById("scriptEditor");
+  if (nameEl) nameEl.value = sc?.name || "";
+  if (codeEl) codeEl.value = sc?.code || "";
+  if (runAtEl) runAtEl.value = sc?.runAt || "document_idle";
+  if (matchEl) matchEl.value = sc?.match || "";
+  if (delBtn) delBtn.style.display = id ? "" : "none";
+  if (editorEl) {
+    editorEl.style.display = "";
+    nameEl?.focus();
+  }
 }
 
 function closeScriptEditor() {
   editingScriptId = null;
-  const ed = document.getElementById('scriptEditor');
-  if (ed) ed.style.display = 'none';
+  const ed = document.getElementById("scriptEditor");
+  if (ed) ed.style.display = "none";
 }
 
 function initScriptEditor() {
-  document.getElementById('btnNewScript')?.addEventListener('click', () => openScriptEditor(null));
-  document.getElementById('btnCloseEditor')?.addEventListener('click', closeScriptEditor);
-
-  document.getElementById('btnSaveScript')?.addEventListener('click', () => {
-    const name  = (document.getElementById('editorName')?.value || '').trim() || t('defaultScriptName');
-    const code  = document.getElementById('editorCode')?.value || '';
-    const runAt = document.getElementById('editorRunAt')?.value || 'document_idle';
-    // Normalisation légère : espaces retirés, casse uniformisée, "https://",
-    // chemin et port éventuels retirés s'ils ont été collés par erreur —
-    // la comparaison côté inject.js se fait uniquement sur le hostname.
-    let match = (document.getElementById('editorMatch')?.value || '').trim().toLowerCase();
-    match = match.replace(/^[a-z]+:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
-    if (!code.trim()) { toast(t('emptyCode'), 'err'); return; }
-    let scripts = [...(cfg.customScripts || [])];
-    if (editingScriptId) {
-      scripts = scripts.map(s => s.id === editingScriptId ? { ...s, name, code, runAt, match } : s);
-    } else {
-      scripts.push({ id: `sc_${Date.now()}`, name, code, runAt, match, enabled: true });
+  document.getElementById("btnNewScript")?.addEventListener("click", () => openScriptEditor(null));
+  document.getElementById("btnCloseEditor")?.addEventListener("click", closeScriptEditor);
+  document.getElementById("btnSaveScript")?.addEventListener("click", () => {
+    const name = (document.getElementById("editorName")?.value || "").trim() || t("defaultScriptName");
+    const code = document.getElementById("editorCode")?.value || "";
+    const runAt = document.getElementById("editorRunAt")?.value || "document_idle";
+    let match = (document.getElementById("editorMatch")?.value || "").trim().toLowerCase();
+    match = match.replace(/^[a-z]+:\/\//, "").replace(/\/.*$/, "").replace(/:\d+$/, "");
+    if (!code.trim()) {
+      toast(t("emptyCode"), "err");
+      return;
     }
-    applySettings({ customScripts: scripts });
-    toast(t('toastScriptSaved'));
+    let scripts = [ ...cfg.customScripts || [] ];
+    if (editingScriptId) {
+      scripts = scripts.map(s => s.id === editingScriptId ? {
+        ...s,
+        name: name,
+        code: code,
+        runAt: runAt,
+        match: match
+      } : s);
+    } else {
+      scripts.push({
+        id: `sc_${Date.now()}`,
+        name: name,
+        code: code,
+        runAt: runAt,
+        match: match,
+        enabled: true
+      });
+    }
+    applySettings({
+      customScripts: scripts
+    });
+    toast(t("toastScriptSaved"));
     closeScriptEditor();
   });
-
-  document.getElementById('btnDeleteScript')?.addEventListener('click', async () => {
-    const ok = await showConfirm('confirmDeleteTitle', 'confirmDeleteMsg');
+  document.getElementById("btnDeleteScript")?.addEventListener("click", async () => {
+    const ok = await showConfirm("confirmDeleteTitle", "confirmDeleteMsg");
     if (!ok) return;
     const scripts = (cfg.customScripts || []).filter(s => s.id !== editingScriptId);
-    applySettings({ customScripts: scripts });
-    toast(t('toastScriptDeleted'), 'info');
+    applySettings({
+      customScripts: scripts
+    });
+    toast(t("toastScriptDeleted"), "info");
     closeScriptEditor();
   });
-
-  // Snippets exemples
-  document.querySelectorAll('.tip-btn[data-snippet-key]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const codeEl = document.getElementById('editorCode');
-      if (codeEl) { codeEl.value = t(btn.dataset.snippetKey); codeEl.focus(); }
+  document.querySelectorAll(".tip-btn[data-snippet-key]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const codeEl = document.getElementById("editorCode");
+      if (codeEl) {
+        codeEl.value = t(btn.dataset.snippetKey);
+        codeEl.focus();
+      }
     });
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// SETTINGS
-// ════════════════════════════════════════════════════════════════
 function applyTheme(newTheme) {
   theme = newTheme;
-  document.body.classList.remove('dark', 'light');
+  document.body.classList.remove("dark", "light");
   document.body.classList.add(newTheme);
-  document.querySelectorAll('.theme-pick').forEach(b =>
-    b.classList.toggle('active', b.dataset.theme === newTheme)
-  );
-  const moon = document.getElementById('iconMoon');
-  const sun  = document.getElementById('iconSun');
-  if (moon) moon.style.display = newTheme === 'dark'  ? '' : 'none';
-  if (sun)  sun.style.display  = newTheme === 'light' ? '' : 'none';
-  chrome.storage.sync.set({ theme: newTheme });
+  document.querySelectorAll(".theme-pick").forEach(b => b.classList.toggle("active", b.dataset.theme === newTheme));
+  const moon = document.getElementById("iconMoon");
+  const sun = document.getElementById("iconSun");
+  if (moon) moon.style.display = newTheme === "dark" ? "" : "none";
+  if (sun) sun.style.display = newTheme === "light" ? "" : "none";
+  chrome.storage.sync.set({
+    theme: newTheme
+  });
 }
 
-// ════════════════════════════════════════════════════════════════
-// EXPORT / IMPORT — sauvegarde complète des réglages
-// ════════════════════════════════════════════════════════════════
 async function exportSettings() {
   const settings = {};
-  Object.keys(FACTORY_DEFAULTS).forEach(k => { settings[k] = !!cfg[k]; });
-
-  // userDefaults n'est pas gardé dans une variable JS (seulement écrit dans
-  // le storage par "Sauvegarder comme défaut") — on va le chercher au moment
-  // de l'export, sinon une sauvegarde/restauration le perdait silencieusement.
+  Object.keys(FACTORY_DEFAULTS).forEach(k => {
+    settings[k] = !!cfg[k];
+  });
   let userDefaults = null;
+  let networkBlocking = false;
   try {
-    const stored = await chrome.storage.sync.get({ userDefaults: null });
+    const stored = await chrome.storage.sync.get({
+      userDefaults: null,
+      networkBlocking: false
+    });
+    networkBlocking = !!stored.networkBlocking;
     if (stored.userDefaults) {
       const snap = JSON.parse(stored.userDefaults);
       const safe = {};
-      Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in snap) safe[k] = !!snap[k]; });
+      Object.keys(FACTORY_DEFAULTS).forEach(k => {
+        if (k in snap) safe[k] = !!snap[k];
+      });
       userDefaults = safe;
     }
   } catch (_) {}
-
   const data = {
-    _meta: { app: 'Overpass', version: VERSION, exportedAt: new Date().toISOString() },
-    settings,
+    _meta: {
+      app: "Overpass",
+      version: VERSION,
+      exportedAt: (new Date).toISOString()
+    },
+    settings: settings,
     customScripts: cfg.customScripts || [],
-    excludedSites,
-    siteProfiles,
-    userDefaults,
+    excludedSites: excludedSites,
+    siteProfiles: siteProfiles,
+    userDefaults: userDefaults,
+    networkBlocking: networkBlocking,
     language: lang,
-    theme,
+    theme: theme
   };
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `overpass-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const blob = new Blob([ JSON.stringify(data, null, 2) ], {
+    type: "application/json"
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `overpass-backup-${(new Date).toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast(t('toastExportDone'));
+  setTimeout(() => URL.revokeObjectURL(url), 1e3);
+  toast(t("toastExportDone"));
 }
 
-// Valide et nettoie le contenu d'un fichier de sauvegarde avant tout usage —
-// même logique défensive que pour les payloads overlays/scripts déjà en place
-// (on ne fait jamais confiance aveuglément à un fichier externe).
 function parseBackupFile(text) {
   let data;
-  try { data = JSON.parse(text); } catch (_) { return null; }
-  if (!data || typeof data !== 'object') return null;
-
+  try {
+    data = JSON.parse(text);
+  } catch (_) {
+    return null;
+  }
+  if (!data || typeof data !== "object") return null;
   const settings = {};
-  if (data.settings && typeof data.settings === 'object') {
+  if (data.settings && typeof data.settings === "object") {
     Object.keys(FACTORY_DEFAULTS).forEach(k => {
       if (k in data.settings) settings[k] = !!data.settings[k];
     });
   }
-
   let customScripts = [];
   if (Array.isArray(data.customScripts)) {
-    customScripts = data.customScripts
-      .filter(s => s && typeof s === 'object' && typeof s.code === 'string')
-      .map(s => ({
-        id: typeof s.id === 'string' && s.id ? s.id : `sc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: typeof s.name === 'string' && s.name.trim() ? s.name.slice(0, 60) : t('defaultScriptName'),
-        code: s.code,
-        runAt: ['document_start', 'document_end', 'document_idle'].includes(s.runAt) ? s.runAt : 'document_idle',
-        match: typeof s.match === 'string' ? s.match.trim().toLowerCase().slice(0, 256) : '',
-        enabled: !!s.enabled,
-      }));
+    customScripts = data.customScripts.filter(s => s && typeof s === "object" && typeof s.code === "string").map(s => ({
+      id: typeof s.id === "string" && s.id ? s.id : `sc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: typeof s.name === "string" && s.name.trim() ? s.name.slice(0, 60) : t("defaultScriptName"),
+      code: s.code,
+      runAt: [ "document_start", "document_end", "document_idle" ].includes(s.runAt) ? s.runAt : "document_idle",
+      match: typeof s.match === "string" ? s.match.trim().toLowerCase().slice(0, 256) : "",
+      enabled: !!s.enabled
+    }));
   }
-
   let excludedSitesImported = [];
   if (Array.isArray(data.excludedSites)) {
-    excludedSitesImported = data.excludedSites.filter(h => typeof h === 'string' && h.length > 0 && h.length < 256);
+    excludedSitesImported = data.excludedSites.filter(h => typeof h === "string" && h.length > 0 && h.length < 256);
   }
-
-  // siteProfiles : objet hostname -> sous-ensemble de toggles. Chaque profil
-  // est filtré aux seules clés FACTORY_DEFAULTS — même logique défensive que
-  // sanitizeProfile() côté content.js, pour ne jamais faire confiance à un
-  // fichier externe.
   let siteProfilesImported = {};
-  if (data.siteProfiles && typeof data.siteProfiles === 'object' && !Array.isArray(data.siteProfiles)) {
+  if (data.siteProfiles && typeof data.siteProfiles === "object" && !Array.isArray(data.siteProfiles)) {
     Object.entries(data.siteProfiles).forEach(([host, profile]) => {
-      if (typeof host !== 'string' || !host || host.length > 255) return;
-      if (!profile || typeof profile !== 'object') return;
+      if (typeof host !== "string" || !host || host.length > 255) return;
+      if (!profile || typeof profile !== "object") return;
       const safe = {};
       let any = false;
-      Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in profile) { safe[k] = !!profile[k]; any = true; } });
+      Object.keys(FACTORY_DEFAULTS).forEach(k => {
+        if (k in profile) {
+          safe[k] = !!profile[k];
+          any = true;
+        }
+      });
       if (any) siteProfilesImported[host] = safe;
     });
   }
-
-  const language = ['fr', 'en', 'es', 'de'].includes(data.language) ? data.language : null;
-  const theme    = ['dark', 'light'].includes(data.theme) ? data.theme : null;
-
-  // userDefaults : mêmes clés que "settings", filtrées de la même façon —
-  // ne jamais faire confiance à un fichier externe.
+  const language = [ "fr", "en", "es", "de" ].includes(data.language) ? data.language : null;
+  const theme = [ "dark", "light" ].includes(data.theme) ? data.theme : null;
+  const networkBlocking = typeof data.networkBlocking === "boolean" ? data.networkBlocking : null;
   let userDefaults = null;
-  if (data.userDefaults && typeof data.userDefaults === 'object' && !Array.isArray(data.userDefaults)) {
+  if (data.userDefaults && typeof data.userDefaults === "object" && !Array.isArray(data.userDefaults)) {
     const safe = {};
     let any = false;
-    Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in data.userDefaults) { safe[k] = !!data.userDefaults[k]; any = true; } });
+    Object.keys(FACTORY_DEFAULTS).forEach(k => {
+      if (k in data.userDefaults) {
+        safe[k] = !!data.userDefaults[k];
+        any = true;
+      }
+    });
     if (any) userDefaults = safe;
   }
-
   return {
-    settings, customScripts,
+    settings: settings,
+    customScripts: customScripts,
     excludedSites: excludedSitesImported,
     siteProfiles: siteProfilesImported,
-    userDefaults,
-    language, theme,
+    userDefaults: userDefaults,
+    networkBlocking: networkBlocking,
+    language: language,
+    theme: theme
   };
 }
 
 async function handleImportFile(file) {
   if (!file) return;
   let text;
-  try { text = await file.text(); } catch (_) { toast(t('toastImportError'), 'err'); return; }
-
-  const parsed = parseBackupFile(text);
-  if (!parsed) { toast(t('toastImportError'), 'err'); return; }
-
-  const ok = await showConfirm(
-    'confirmImportTitle', null,
-    t('importSummary', parsed.customScripts.length, parsed.excludedSites.length, Object.keys(parsed.siteProfiles).length)
-  );
-  if (!ok) return;
-
-  // Toggles + scripts : passe par applySettings (application live immédiate,
-  // puis persistance — même chemin que tous les autres réglages, avec la
-  // même détection de quota).
-  await applySettings({ ...parsed.settings, customScripts: parsed.customScripts });
-
-  // excludedSites / siteProfiles / language / theme : remplacement complet
-  // (une restauration de sauvegarde doit refléter exactement l'état
-  // sauvegardé, pas le fusionner avec l'existant).
-  excludedSites = parsed.excludedSites;
-  siteProfiles  = parsed.siteProfiles;
-  const toStore = { excludedSites, siteProfiles };
-  if (parsed.language) { lang = parsed.language; toStore.language = lang; }
-  if (parsed.theme)    { theme = parsed.theme;   toStore.theme    = theme; }
-  if (parsed.userDefaults) toStore.userDefaults = JSON.stringify(parsed.userDefaults);
-  let quotaExceeded = false;
-  try { await chrome.storage.sync.set(toStore); } catch (err) {
-    if (/quota/i.test(err?.message || '')) quotaExceeded = true;
+  try {
+    text = await file.text();
+  } catch (_) {
+    toast(t("toastImportError"), "err");
+    return;
   }
-
+  const parsed = parseBackupFile(text);
+  if (!parsed) {
+    toast(t("toastImportError"), "err");
+    return;
+  }
+  const ok = await showConfirm("confirmImportTitle", null, t("importSummary", parsed.customScripts.length, parsed.excludedSites.length, Object.keys(parsed.siteProfiles).length));
+  if (!ok) return;
+  await applySettings({
+    ...parsed.settings,
+    customScripts: parsed.customScripts
+  });
+  excludedSites = parsed.excludedSites;
+  siteProfiles = parsed.siteProfiles;
+  const toStore = {
+    excludedSites: excludedSites,
+    siteProfiles: siteProfiles
+  };
+  if (parsed.language) {
+    lang = parsed.language;
+    toStore.language = lang;
+  }
+  if (parsed.theme) {
+    theme = parsed.theme;
+    toStore.theme = theme;
+  }
+  if (parsed.userDefaults) toStore.userDefaults = JSON.stringify(parsed.userDefaults);
+  if (parsed.networkBlocking !== null) toStore.networkBlocking = parsed.networkBlocking;
+  let quotaExceeded = false;
+  try {
+    await chrome.storage.sync.set(toStore);
+  } catch (err) {
+    if (/quota/i.test(err?.message || "")) quotaExceeded = true;
+  }
   if (parsed.language) applyI18n();
-  if (parsed.theme)    applyTheme(theme);
+  if (parsed.theme) applyTheme(theme);
+  if (parsed.networkBlocking !== null) {
+    const el = document.getElementById("networkBlockingToggle");
+    if (el) el.checked = parsed.networkBlocking;
+  }
   updateSiteBar();
   renderExcludedList();
   renderProfilesList();
-
-  // Le toast final doit rester honnête : si l'écriture des sites exclus/
-  // profils a échoué pour cause de quota, l'utilisateur doit le savoir
-  // plutôt que de croire l'import entièrement persisté.
-  if (quotaExceeded) toast(t('toastStorageQuotaExceeded'), 'err', 4000);
-  else toast(t('toastImportDone'));
+  if (quotaExceeded) toast(t("toastStorageQuotaExceeded"), "err", 4e3); else toast(t("toastImportDone"));
 }
 
-// ════════════════════════════════════════════════════════════════
-// UPDATE CHECK — lecture seule depuis background.js (throttlé côté background)
-// ════════════════════════════════════════════════════════════════
 function renderUpdateStatus() {
-  const el = document.getElementById('updateStatus');
-  const dot = document.getElementById('updateDot');
-  const btn = document.getElementById('btnCheckUpdate');
+  const el = document.getElementById("updateStatus");
+  const dot = document.getElementById("updateDot");
+  const btn = document.getElementById("btnCheckUpdate");
   const hasUpdate = !!(updateInfo && updateInfo.hasUpdate && updateInfo.latestVersion);
-  if (dot) dot.style.display = hasUpdate ? '' : 'none';
-  if (btn) setText(btn, hasUpdate ? t('goToRelease') : t('checkUpdate'));
+  if (dot) dot.style.display = hasUpdate ? "" : "none";
+  if (btn) setText(btn, hasUpdate ? t("goToRelease") : t("checkUpdate"));
   if (!el) return;
-  el.classList.remove('has-update', 'checking', 'err');
+  el.classList.remove("has-update", "checking", "err");
   if (!updateInfo || updateInfo.ok === false) {
-    el.textContent = t('updateCheckFailed');
-    el.classList.add('err');
+    el.textContent = t("updateCheckFailed");
+    el.classList.add("err");
   } else if (updateInfo.noReleases) {
-    // 404 côté GitHub : le dépôt n'a simplement aucune Release publiée pour
-    // l'instant — ce n'est pas un échec du mécanisme, donc pas de style err.
-    el.textContent = t('updateNoReleases');
+    el.textContent = t("updateNoReleases");
   } else if (hasUpdate) {
-    el.textContent = t('updateAvailable', updateInfo.latestVersion);
-    el.classList.add('has-update');
+    el.textContent = t("updateAvailable", updateInfo.latestVersion);
+    el.classList.add("has-update");
   } else {
-    el.textContent = t('updateUpToDate');
+    el.textContent = t("updateUpToDate");
   }
 }
 
 async function loadUpdateInfo() {
   try {
-    updateInfo = await chrome.runtime.sendMessage({ action: 'getUpdateInfo' });
-  } catch (_) { updateInfo = null; }
+    updateInfo = await chrome.runtime.sendMessage({
+      action: "getUpdateInfo"
+    });
+  } catch (_) {
+    updateInfo = null;
+  }
   renderUpdateStatus();
 }
 
 async function checkUpdateNow() {
-  const el = document.getElementById('updateStatus');
-  if (el) { el.textContent = t('updateChecking'); el.classList.add('checking'); }
+  const el = document.getElementById("updateStatus");
+  if (el) {
+    el.textContent = t("updateChecking");
+    el.classList.add("checking");
+  }
   try {
-    updateInfo = await chrome.runtime.sendMessage({ action: 'checkUpdate' });
-  } catch (_) { updateInfo = { ok: false }; }
+    updateInfo = await chrome.runtime.sendMessage({
+      action: "checkUpdate"
+    });
+  } catch (_) {
+    updateInfo = {
+      ok: false
+    };
+  }
   renderUpdateStatus();
-  if (updateInfo?.hasUpdate) toast(t('toastUpdateAvailable', updateInfo.latestVersion));
-  else if (updateInfo?.ok === false) toast(t('updateCheckFailed'), 'err');
-  else if (updateInfo?.noReleases) toast(t('updateNoReleases'), 'info');
-  else toast(t('toastUpdateNone'), 'info');
+  if (updateInfo?.hasUpdate) toast(t("toastUpdateAvailable", updateInfo.latestVersion)); else if (updateInfo?.ok === false) toast(t("updateCheckFailed"), "err"); else if (updateInfo?.noReleases) toast(t("updateNoReleases"), "info"); else toast(t("toastUpdateNone"), "info");
 }
 
-// Le bouton change de rôle selon l'état : "Vérifier" relance une vérification,
-// "Mettre à jour" (quand une nouvelle version existe) amène directement sur
-// sa page de release GitHub — l'auto-installation n'étant pas possible pour
-// une extension distribuée hors Web Store, c'est la voie la plus directe.
 function handleUpdateButtonClick() {
   if (updateInfo?.hasUpdate && updateInfo.url) {
-    chrome.tabs.create({ url: updateInfo.url });
+    chrome.tabs.create({
+      url: updateInfo.url
+    });
   } else {
     checkUpdateNow();
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// REPORTING — ouvre la page de signalement dédiée (report.html) en onglet
-// complet. Toute la construction du rapport (contexte, aperçu, envoi vers
-// GitHub) y est gérée de façon autonome ; popup.js ne fait que naviguer.
-// ════════════════════════════════════════════════════════════════
 function reportGeneral() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('report.html') });
+  chrome.tabs.create({
+    url: chrome.runtime.getURL("report.html")
+  });
 }
 
 function reportSite() {
-  if (!currentHostname) { reportGeneral(); return; }
-  const url = chrome.runtime.getURL('report.html') + '?' + new URLSearchParams({ site: currentHostname });
-  chrome.tabs.create({ url });
+  if (!currentHostname) {
+    reportGeneral();
+    return;
+  }
+  const url = chrome.runtime.getURL("report.html") + "?" + new URLSearchParams({
+    site: currentHostname
+  });
+  chrome.tabs.create({
+    url: url
+  });
 }
 
 function initSettings() {
-  // Langue
-  document.querySelectorAll('.lang-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+  document.querySelectorAll(".lang-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
       lang = btn.dataset.lang;
-      chrome.storage.sync.set({ language: lang });
+      chrome.storage.sync.set({
+        language: lang
+      });
       applyI18n();
       updateUI();
     });
   });
-
-  // Thème (boutons dans settings)
-  document.getElementById('themePickDark')?.addEventListener('click',  () => applyTheme('dark'));
-  document.getElementById('themePickLight')?.addEventListener('click', () => applyTheme('light'));
-
-  // Thème (bouton header)
-  document.getElementById('btnTheme')?.addEventListener('click', () => {
-    applyTheme(theme === 'dark' ? 'light' : 'dark');
+  document.getElementById("themePickDark")?.addEventListener("click", () => applyTheme("dark"));
+  document.getElementById("themePickLight")?.addEventListener("click", () => applyTheme("light"));
+  document.getElementById("btnTheme")?.addEventListener("click", () => {
+    applyTheme(theme === "dark" ? "light" : "dark");
   });
-
-  // Sauvegarder défauts
-  document.getElementById('btnSaveDefaults')?.addEventListener('click', async () => {
+  document.getElementById("btnSaveDefaults")?.addEventListener("click", async () => {
     const snap = {};
     Object.keys(FACTORY_DEFAULTS).forEach(k => snap[k] = cfg[k]);
-    const ok = await syncSet({ userDefaults: JSON.stringify(snap) });
-    if (ok) toast(t('toastDefaultsSaved'));
+    const ok = await syncSet({
+      userDefaults: JSON.stringify(snap)
+    });
+    if (ok) toast(t("toastDefaultsSaved"));
   });
-
-  // Charger défauts
-  document.getElementById('btnLoadDefaults')?.addEventListener('click', async () => {
-    const stored = await chrome.storage.sync.get({ userDefaults: null });
-    if (!stored.userDefaults) { toast(t('toastNoDefaults'), 'info'); return; }
+  document.getElementById("btnLoadDefaults")?.addEventListener("click", async () => {
+    const stored = await chrome.storage.sync.get({
+      userDefaults: null
+    });
+    if (!stored.userDefaults) {
+      toast(t("toastNoDefaults"), "info");
+      return;
+    }
     try {
       const snap = JSON.parse(stored.userDefaults);
-      // Valider le snap avant de l'appliquer
       const safe = {};
-      Object.keys(FACTORY_DEFAULTS).forEach(k => { if (k in snap) safe[k] = !!snap[k]; });
+      Object.keys(FACTORY_DEFAULTS).forEach(k => {
+        if (k in snap) safe[k] = !!snap[k];
+      });
       applySettings(safe);
-      toast(t('toastDefaultsLoaded'));
-    } catch (_) { toast(t('readError'), 'err'); }
+      toast(t("toastDefaultsLoaded"));
+    } catch (_) {
+      toast(t("readError"), "err");
+    }
   });
-
-  // Export / Import
-  document.getElementById('btnExportSettings')?.addEventListener('click', exportSettings);
-  document.getElementById('btnImportSettings')?.addEventListener('click', () => {
-    document.getElementById('importFileInput')?.click();
+  document.getElementById("btnExportSettings")?.addEventListener("click", exportSettings);
+  document.getElementById("btnImportSettings")?.addEventListener("click", () => {
+    document.getElementById("importFileInput")?.click();
   });
-  document.getElementById('importFileInput')?.addEventListener('change', async e => {
+  document.getElementById("importFileInput")?.addEventListener("change", async e => {
     const file = e.target.files?.[0];
     await handleImportFile(file);
-    e.target.value = ''; // permet de réimporter le même fichier ensuite
+    e.target.value = "";
   });
-
-  // Reset usine — applique sur la page immédiatement, persiste ensuite
-  document.getElementById('btnFactoryReset')?.addEventListener('click', async () => {
-    const ok = await showConfirm('confirmFactoryTitle', 'confirmFactoryMsg');
+  document.getElementById("btnFactoryReset")?.addEventListener("click", async () => {
+    const ok = await showConfirm("confirmFactoryTitle", "confirmFactoryMsg");
     if (!ok) return;
-    cfg = { ...FACTORY_DEFAULTS, customScripts: [] };
+    cfg = {
+      ...FACTORY_DEFAULTS,
+      customScripts: []
+    };
     updateUI();
-    send('updateSettings', { settings: cfg });
+    send("updateSettings", {
+      settings: cfg
+    });
     try {
       await chrome.storage.sync.clear();
-      await chrome.storage.sync.set({ ...FACTORY_DEFAULTS, customScripts: '[]', language: lang, theme });
-      // storage.sync.clear() efface aussi excludedSites/siteProfiles/
-      // userDefaults, mais les variables en mémoire du popup ne le
-      // reflétaient pas : les listes "Sites exclus"/"Profils" restaient
-      // affichées avec l'ancien contenu tant que le popup n'était pas rouvert.
+      await chrome.storage.sync.set({
+        ...FACTORY_DEFAULTS,
+        customScripts: "[]",
+        language: lang,
+        theme: theme
+      });
       excludedSites = [];
-      siteProfiles  = {};
+      siteProfiles = {};
       renderExcludedList();
       renderProfilesList();
       updateSiteBar();
-      toast(t('toastFactoryDone'));
+      const networkBlockingEl = document.getElementById("networkBlockingToggle");
+      if (networkBlockingEl) networkBlockingEl.checked = false;
+      toast(t("toastFactoryDone"));
     } catch (err) {
-      if (/quota/i.test(err?.message || '')) toast(t('toastStorageQuotaExceeded'), 'err', 4000);
+      if (/quota/i.test(err?.message || "")) toast(t("toastStorageQuotaExceeded"), "err", 4e3);
     }
   });
-
-  // Raccourcis clavier — copie le chemin plutôt que de tenter une navigation
-  // directe vers une page chrome:// (non garantie depuis une extension)
-  document.getElementById('shortcutsLink')?.addEventListener('click', async () => {
+  document.getElementById("shortcutsLink")?.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText('chrome://extensions/shortcuts');
-      toast(t('toastShortcutsCopied'));
+      await navigator.clipboard.writeText("chrome://extensions/shortcuts");
+      toast(t("toastShortcutsCopied"));
     } catch (_) {}
   });
-
-  // Blocage réseau des scripts anti-adblock connus — bascule simple,
-  // background.js réagit au changement de storage pour (dés)activer le
-  // ruleset declarativeNetRequest correspondant.
-  document.getElementById('networkBlockingToggle')?.addEventListener('change', async e => {
+  document.getElementById("networkBlockingToggle")?.addEventListener("change", async e => {
     const enabled = e.target.checked;
-    const ok = await syncSet({ networkBlocking: enabled });
-    if (!ok) { e.target.checked = !enabled; return; }
-    toast(t(enabled ? 'toastNetworkBlockingOn' : 'toastNetworkBlockingOff'), enabled ? 'ok' : 'info');
+    const ok = await syncSet({
+      networkBlocking: enabled
+    });
+    if (!ok) {
+      e.target.checked = !enabled;
+      return;
+    }
+    toast(t(enabled ? "toastNetworkBlockingOn" : "toastNetworkBlockingOff"), enabled ? "ok" : "info");
   });
-
-  // Mise à jour et signalement
-  document.getElementById('btnCheckUpdate')?.addEventListener('click', handleUpdateButtonClick);
-  document.getElementById('btnReportIssue')?.addEventListener('click', reportGeneral);
-  document.getElementById('updateDot')?.addEventListener('click', () => {
-    if (updateInfo?.url) chrome.tabs.create({ url: updateInfo.url });
-    else switchToTab('settings');
+  document.getElementById("btnCheckUpdate")?.addEventListener("click", handleUpdateButtonClick);
+  document.getElementById("btnReportIssue")?.addEventListener("click", reportGeneral);
+  document.getElementById("updateDot")?.addEventListener("click", () => {
+    if (updateInfo?.url) chrome.tabs.create({
+      url: updateInfo.url
+    }); else switchToTab("settings");
   });
-
-  // Labels version
-  const vl = document.getElementById('versionText');
-  const av = document.getElementById('aboutVersion');
+  const vl = document.getElementById("versionText");
+  const av = document.getElementById("aboutVersion");
   if (vl) vl.textContent = `v${VERSION}`;
   if (av) av.textContent = VERSION;
 }
 
-// ════════════════════════════════════════════════════════════════
-// RUNTIME MESSAGES (inject.js → content.js → background → popup)
-// Validation : on vérifie action et payload avant tout usage
-// ════════════════════════════════════════════════════════════════
 function initRuntimeMessages() {
   chrome.runtime.onMessage.addListener(msg => {
-    if (!msg || typeof msg !== 'object') return;
-    const { action, payload } = msg;
-
+    if (!msg || typeof msg !== "object") return;
+    const {action: action, payload: payload} = msg;
     switch (action) {
-      case 'overlayList':
-        if (Array.isArray(payload)) renderOverlayList(payload);
-        break;
+     case "overlayList":
+      if (Array.isArray(payload)) renderOverlayList(payload);
+      break;
 
-      case 'pickerDone':
-        pickerOn = false;
-        updatePickerBtn();
-        toast(t('toastPickerDone'));
-        send('getState');
-        break;
+     case "pickerDone":
+      pickerOn = false;
+      updatePickerBtn();
+      toast(t("toastPickerDone"));
+      send("getState");
+      break;
 
-      case 'pickerCancelled':
-        pickerOn = false;
-        updatePickerBtn();
-        // Pas de toast ici — le picker a déjà été annulé depuis la page
-        break;
+     case "pickerCancelled":
+      pickerOn = false;
+      updatePickerBtn();
+      break;
 
-      case 'state':
-        if (payload && typeof payload === 'object') {
-          // Validation minimale : contentHint doit être une des valeurs
-          // connues ou absent, jamais une chaîne arbitraire injectée.
-          const hint = ['reading', 'video'].includes(payload.contentHint) ? payload.contentHint : null;
-          evaluateContentHint(hint);
-        }
-        break;
+     case "state":
+      if (payload && typeof payload === "object") {
+        const hint = [ "reading", "video" ].includes(payload.contentHint) ? payload.contentHint : null;
+        evaluateContentHint(hint);
+      }
+      break;
 
-      case 'resourceList':
-        // Non affiché dans le popup (panel flottant dans la page)
-        break;
+     case "resourceList":
+      break;
     }
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// LOAD
-// ════════════════════════════════════════════════════════════════
 async function loadSettings() {
   const stored = await chrome.storage.sync.get({
     ...FACTORY_DEFAULTS,
-    customScripts: '[]',
-    language: 'fr',
-    theme: 'dark',
+    customScripts: "[]",
+    language: "fr",
+    theme: "dark",
     excludedSites: [],
     siteProfiles: {},
-    networkBlocking: false,
+    networkBlocking: false
   });
-  lang  = stored.language || 'fr';
-  theme = stored.theme    || 'dark';
+  lang = stored.language || "fr";
+  theme = stored.theme || "dark";
   excludedSites = Array.isArray(stored.excludedSites) ? stored.excludedSites : [];
-  siteProfiles  = (stored.siteProfiles && typeof stored.siteProfiles === 'object' && !Array.isArray(stored.siteProfiles))
-    ? stored.siteProfiles : {};
-
-  const networkBlockingInput = document.getElementById('networkBlockingToggle');
+  siteProfiles = stored.siteProfiles && typeof stored.siteProfiles === "object" && !Array.isArray(stored.siteProfiles) ? stored.siteProfiles : {};
+  const networkBlockingInput = document.getElementById("networkBlockingToggle");
   if (networkBlockingInput) networkBlockingInput.checked = !!stored.networkBlocking;
-
   let scripts = [];
-  try { scripts = JSON.parse(stored.customScripts || '[]'); } catch (_) {}
-  // Retirer les clés non-toggle avant de construire cfg pour rester dans ALLOWED_KEYS côté inject.js.
-  const { language: _l, theme: _t, excludedSites: _es, siteProfiles: _sp, customScripts: _cs, networkBlocking: _nb, ...toggles } = stored;
-  cfg = { ...FACTORY_DEFAULTS, ...toggles, customScripts: scripts };
-
+  try {
+    scripts = JSON.parse(stored.customScripts || "[]");
+  } catch (_) {}
+  const {language: _l, theme: _t, excludedSites: _es, siteProfiles: _sp, customScripts: _cs, networkBlocking: _nb, ...toggles} = stored;
+  cfg = {
+    ...FACTORY_DEFAULTS,
+    ...toggles,
+    customScripts: scripts
+  };
   applyTheme(theme);
   applyI18n();
   updateUI();
   updateSiteBar();
   renderExcludedList();
   renderProfilesList();
-
-  // Demander l'état courant (liste overlays, etc.)
-  await send('getState');
+  await send("getState");
 }
 
-// ════════════════════════════════════════════════════════════════
-// INIT
-// ════════════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+document.addEventListener("DOMContentLoaded", async () => {
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true
+  });
   tabId = tab?.id || null;
-  currentHostname = tab?.url ? getHostname(tab.url) : '';
-
+  currentHostname = tab?.url ? getHostname(tab.url) : "";
   initTabs();
   initToggles();
   initGroupToggles();
@@ -1886,27 +2204,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   initRuntimeMessages();
   await loadSettings();
   loadUpdateInfo();
-
-  // Synchronisation cross-fenêtre
   chrome.storage.onChanged.addListener(changes => {
     let needsUpdate = false;
-    Object.entries(changes).forEach(([k, { newValue }]) => {
-      if (k === 'customScripts') {
-        try { cfg.customScripts = JSON.parse(newValue || '[]'); needsUpdate = true; } catch (_) {}
-      } else if (k === 'language') {
-        lang = newValue; applyI18n();
-      } else if (k === 'theme') {
+    Object.entries(changes).forEach(([k, {newValue: newValue}]) => {
+      if (k === "customScripts") {
+        try {
+          cfg.customScripts = JSON.parse(newValue || "[]");
+          needsUpdate = true;
+        } catch (_) {}
+      } else if (k === "language") {
+        lang = newValue;
+        applyI18n();
+      } else if (k === "theme") {
         applyTheme(newValue);
-      } else if (k === 'excludedSites') {
+      } else if (k === "excludedSites") {
         excludedSites = Array.isArray(newValue) ? newValue : [];
         updateSiteBar();
         renderExcludedList();
-      } else if (k === 'siteProfiles') {
-        siteProfiles = (newValue && typeof newValue === 'object' && !Array.isArray(newValue)) ? newValue : {};
+      } else if (k === "siteProfiles") {
+        siteProfiles = newValue && typeof newValue === "object" && !Array.isArray(newValue) ? newValue : {};
         updateSiteBar();
         renderProfilesList();
+      } else if (k === "networkBlocking") {
+        const el = document.getElementById("networkBlockingToggle");
+        if (el) el.checked = !!newValue;
       } else if (k in FACTORY_DEFAULTS) {
-        cfg[k] = newValue; needsUpdate = true;
+        cfg[k] = newValue;
+        needsUpdate = true;
       }
     });
     if (needsUpdate) updateUI();
