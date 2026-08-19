@@ -39,5 +39,15 @@
   { "id": 38, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/adblock/adblockpopup.js",                  "resourceTypes": ["script"] } },
   { "id": 39, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/adblockbait.js",                           "resourceTypes": ["script"] } },
   { "id": 40, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/adblockchecker.js",                        "resourceTypes": ["script"] } },
-  { "id": 41, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/antipubblicita.js",                        "resourceTypes": ["script"] } }
+  { "id": 41, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/antipubblicita.js",                        "resourceTypes": ["script"] } },
+  { "id": 42, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/blockcake.js",                             "resourceTypes": ["script"] } },
+  { "id": 43, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/anti-ad-buster.js",                        "resourceTypes": ["script"] } },
+  { "id": 44, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/plugins/better-stop-adblock/",             "resourceTypes": ["script", "stylesheet"] } },
+  { "id": 45, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/js/an-scripts.js",                         "resourceTypes": ["script"] } },
+  { "id": 46, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/wp-content/uploads/an-temp/",              "resourceTypes": ["script", "stylesheet"] } },
+  { "id": 47, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "||adunblock.com/code/",                     "resourceTypes": ["script", "sub_frame"] } },
+  { "id": 48, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "||adblockconverter.com/js/aab.js",          "resourceTypes": ["script"] } },
+  { "id": 49, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/wp-content/plugins/anti_ad_blocker/",      "resourceTypes": ["script"] } },
+  { "id": 50, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "/noadblock.jpg",                            "resourceTypes": ["image"] } },
+  { "id": 51, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "||adreactor.com/js/fab.js",                 "resourceTypes": ["script"] } }
 ]
