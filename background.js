@@ -1,35 +1,34 @@
-/**
- * Overpass v4.0.1 – background.js (Service Worker)
- *
- * Responsabilités :
- *   1. Génère et rotation du token d'authentification postMessage
- *   2. Proxy chrome.cookies → appelé par content.js
- *   3. Badge de l'icône
- */
-
 const FACTORY_DEFAULTS = {
-  contextmenu: true,  selectstart: true,  clipboard: true,  keyboard: true,
-  dragdrop: true,     scroll: false,      cursor: true,     pointerEvents: false,
-  print: true,        overlays: false,    devtools: false,  consoleProtect: false,
-  focus: false,       visibility: true,   zoom: true,        darkMode: false,
+  contextmenu: true,
+  selectstart: true,
+  clipboard: true,
+  keyboard: true,
+  dragdrop: true,
+  scroll: false,
+  cursor: true,
+  pointerEvents: false,
+  print: true,
+  overlays: false,
+  devtools: false,
+  consoleProtect: false,
+  focus: false,
+  visibility: true,
+  zoom: true,
+  darkMode: false
 };
 
-// ── Dépôt GitHub — source des releases et des signalements ────────
-const REPO_SLUG = 'FRENCH-FLIGHT/Overpass-_-Extension';
-const REPO_URL  = `https://github.com/${REPO_SLUG}`;
+const REPO_SLUG = "FRENCH-FLIGHT/Overpass-_-Extension";
 
-// Fait correspondre un hostname à un motif "exemple.com" (exact) ou
-// "*.exemple.com" (domaine + sous-domaines) — même sémantique que
-// content.js / inject.js, pour que le badge reflète correctement une
-// exclusion ou un profil défini via un motif générique.
+const REPO_URL = `https://github.com/${REPO_SLUG}`;
+
 function hostMatchesPattern(host, pattern) {
-  if (!host || typeof pattern !== 'string') return false;
+  if (!host || typeof pattern !== "string") return false;
   const p = pattern.trim().toLowerCase();
   if (!p) return false;
   const h = host.toLowerCase();
-  if (p.startsWith('*.')) {
+  if (p.startsWith("*.")) {
     const base = p.slice(2);
-    return !!base && (h === base || h.endsWith('.' + base));
+    return !!base && (h === base || h.endsWith("." + base));
   }
   return h === p;
 }
@@ -39,12 +38,12 @@ function hostInList(host, list) {
 }
 
 function findSiteProfile(host, profiles) {
-  if (!host || !profiles || typeof profiles !== 'object') return null;
+  if (!host || !profiles || typeof profiles !== "object") return null;
   if (profiles[host]) return profiles[host];
   let best = null, bestLen = -1;
   Object.keys(profiles).forEach(key => {
     const p = key.trim().toLowerCase();
-    if (!p.startsWith('*.')) return;
+    if (!p.startsWith("*.")) return;
     const base = p.slice(2);
     if (base && hostMatchesPattern(host, key) && base.length > bestLen) {
       best = profiles[key];
@@ -54,15 +53,11 @@ function findSiteProfile(host, profiles) {
   return best;
 }
 
-// ── Vérification de mise à jour ────────────────────────────────────
-// Lecture seule (api.github.com), throttlée pour rester très en-deçà des
-// limites de l'API publique GitHub. Résultat stocké en storage.local (donné
-// propre à cet appareil, pas synchronisé entre profils).
-const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1e3;
 
 function compareVersions(a, b) {
-  const pa = String(a || '0').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
-  const pb = String(b || '0').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  const pa = String(a || "0").replace(/^v/i, "").split(".").map(n => parseInt(n, 10) || 0);
+  const pb = String(b || "0").replace(/^v/i, "").split(".").map(n => parseInt(n, 10) || 0);
   for (let i = 0; i < 3; i++) {
     const da = pa[i] || 0, db = pb[i] || 0;
     if (da !== db) return da > db ? 1 : -1;
@@ -74,80 +69,85 @@ async function checkForUpdate(force = false) {
   const current = chrome.runtime.getManifest().version;
   try {
     if (!force) {
-      const { updateInfo } = await chrome.storage.local.get({ updateInfo: null });
+      const {updateInfo: updateInfo} = await chrome.storage.local.get({
+        updateInfo: null
+      });
       if (updateInfo?.checkedAt && Date.now() - updateInfo.checkedAt < UPDATE_CHECK_INTERVAL_MS) {
         return updateInfo;
       }
     }
     const res = await fetch(`https://api.github.com/repos/${REPO_SLUG}/releases/latest`, {
-      headers: { Accept: 'application/vnd.github+json' },
+      headers: {
+        Accept: "application/vnd.github+json"
+      }
     });
-    // 404 signifie qu'aucune Release n'a encore été publiée sur le dépôt
-    // (différent d'un tag ou d'un commit) — état normal et attendu tant que
-    // le projet n'a pas de release, pas un échec de la vérification elle-même.
     if (res.status === 404) {
       const info = {
-        latestVersion: null, url: `${REPO_URL}/releases`, hasUpdate: false,
-        noReleases: true, checkedAt: Date.now(), ok: true,
+        latestVersion: null,
+        url: `${REPO_URL}/releases`,
+        hasUpdate: false,
+        noReleases: true,
+        checkedAt: Date.now(),
+        ok: true
       };
-      await chrome.storage.local.set({ updateInfo: info });
+      await chrome.storage.local.set({
+        updateInfo: info
+      });
       return info;
     }
-    if (!res.ok) throw new Error('http ' + res.status);
+    if (!res.ok) throw new Error("http " + res.status);
     const data = await res.json();
-    const latestVersion = String(data.tag_name || '').replace(/^v/i, '');
+    const latestVersion = String(data.tag_name || "").replace(/^v/i, "");
     const info = {
       latestVersion: latestVersion || null,
       url: data.html_url || `${REPO_URL}/releases/latest`,
       hasUpdate: latestVersion ? compareVersions(latestVersion, current) > 0 : false,
       noReleases: false,
       checkedAt: Date.now(),
-      ok: true,
+      ok: true
     };
-    await chrome.storage.local.set({ updateInfo: info });
+    await chrome.storage.local.set({
+      updateInfo: info
+    });
     return info;
   } catch (_) {
-    // Pas de réseau, API indisponible, ou taux limité — échec réel, on
-    // renvoie le dernier résultat connu s'il existe plutôt que de perdre
-    // l'information précédente.
-    const { updateInfo } = await chrome.storage.local.get({ updateInfo: null });
-    return updateInfo || { ok: false, checkedAt: Date.now() };
+    const {updateInfo: updateInfo} = await chrome.storage.local.get({
+      updateInfo: null
+    });
+    return updateInfo || {
+      ok: false,
+      checkedAt: Date.now()
+    };
   }
 }
 
-// ── Token de session ─────────────────────────────────────────────
 function generateToken() {
   const arr = new Uint8Array(32);
   crypto.getRandomValues(arr);
-  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(arr, b => b.toString(16).padStart(2, "0")).join("");
 }
 
-// ── Clé de canal propre à cette installation ──────────────────────
-// Sert à faire migrer le trafic postMessage content.js↔inject.js loin des
-// noms de canal fixes (identiques pour toute installation de l'extension,
-// donc détectables de façon triviale et permanente par un site). Voir le
-// commentaire détaillé dans inject.js ("SECURE MESSAGE BUS"). Plus courte
-// que le token car ce n'est pas une frontière de sécurité — seulement un
-// identifiant de routage — le token reste seul responsable de
-// l'authentification des messages.
 function generateBusKey() {
   const arr = new Uint8Array(8);
   crypto.getRandomValues(arr);
-  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(arr, b => b.toString(16).padStart(2, "0")).join("");
 }
 
-chrome.runtime.onInstalled.addListener(async ({ reason }) => {
-  await chrome.storage.local.set({ __op_token: generateToken(), __op_bus: generateBusKey() });
-  if (reason === 'install') {
+chrome.runtime.onInstalled.addListener(async ({reason: reason}) => {
+  await chrome.storage.local.set({
+    __op_token: generateToken(),
+    __op_bus: generateBusKey()
+  });
+  if (reason === "install") {
     await chrome.storage.sync.set({
       ...FACTORY_DEFAULTS,
-      customScripts: '[]',
-      language: 'fr',
-      theme: 'dark',
+      customScripts: "[]",
+      language: "fr",
+      theme: "dark",
       userDefaults: null,
       excludedSites: [],
       siteProfiles: {},
-      networkBlocking: false,
+      networkBlocking: false
     });
   }
   updateAllBadges();
@@ -155,102 +155,112 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   syncNetworkBlockingRuleset();
 });
 
-// Regénère le token (et la clé de canal) à chaque démarrage du navigateur
 chrome.runtime.onStartup.addListener(async () => {
-  await chrome.storage.local.set({ __op_token: generateToken(), __op_bus: generateBusKey() });
+  await chrome.storage.local.set({
+    __op_token: generateToken(),
+    __op_bus: generateBusKey()
+  });
   updateAllBadges();
   checkForUpdate(false);
   syncNetworkBlockingRuleset();
 });
 
-// ── Blocage réseau des scripts anti-adblock connus ─────────────────
-// Fonctionnalité désactivée par défaut (opt-in) : contrairement aux
-// protections existantes (appliquées page par page via inject.js), ceci
-// bloque des requêtes réseau au niveau du navigateur via
-// declarativeNetRequest — un mécanisme différent, plus large, qu'on
-// préfère laisser l'utilisateur activer explicitement plutôt que
-// l'imposer silencieusement à la mise à jour.
 async function syncNetworkBlockingRuleset() {
   try {
-    const { networkBlocking } = await chrome.storage.sync.get({ networkBlocking: false });
+    const {networkBlocking: networkBlocking} = await chrome.storage.sync.get({
+      networkBlocking: false
+    });
     if (networkBlocking) {
-      await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: ['antiadblock'] });
+      await chrome.declarativeNetRequest.updateEnabledRulesets({
+        enableRulesetIds: [ "antiadblock" ]
+      });
     } else {
-      await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: ['antiadblock'] });
+      await chrome.declarativeNetRequest.updateEnabledRulesets({
+        disableRulesetIds: [ "antiadblock" ]
+      });
     }
-  } catch (_) {
-    // declarativeNetRequest indisponible ou ruleset déjà dans l'état voulu
-  }
+  } catch (_) {}
 }
 
 chrome.storage.onChanged.addListener(changes => {
   if (changes.networkBlocking) syncNetworkBlockingRuleset();
 });
 
-// ── Messages ─────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   switch (msg.action) {
+   case "getFactoryDefaults":
+    reply({
+      defaults: FACTORY_DEFAULTS
+    });
+    return true;
 
-    case 'getFactoryDefaults':
-      reply({ defaults: FACTORY_DEFAULTS });
-      return true;
+   case "checkUpdate":
+    checkForUpdate(true).then(reply);
+    return true;
 
-    case 'checkUpdate':
-      checkForUpdate(true).then(reply);
-      return true;
+   case "getUpdateInfo":
+    chrome.storage.local.get({
+      updateInfo: null
+    }).then(({updateInfo: updateInfo}) => reply(updateInfo));
+    return true;
 
-    case 'getUpdateInfo':
-      chrome.storage.local.get({ updateInfo: null }).then(({ updateInfo }) => reply(updateInfo));
-      return true;
-
-    default:
-      return false;
+   default:
+    return false;
   }
 });
 
-// ── Badge ────────────────────────────────────────────────────────
-// Le badge reflète désormais l'état RÉEL de chaque onglet, pas seulement
-// les réglages globaux : site exclu (gris, tiret), profil de site actif
-// (violet, compte du profil), ou réglages globaux (vert si actif).
-const BADGE_COLOR_ACTIVE   = '#22c55e';
-const BADGE_COLOR_PROFILE  = '#a78bfa';
-const BADGE_COLOR_NEUTRAL  = '#64748b';
+const BADGE_COLOR_ACTIVE = "#22c55e";
+
+const BADGE_COLOR_PROFILE = "#a78bfa";
+
+const BADGE_COLOR_NEUTRAL = "#64748b";
 
 function hostnameOf(url) {
-  try { return new URL(url).hostname || ''; } catch (_) { return ''; }
+  try {
+    return new URL(url).hostname || "";
+  } catch (_) {
+    return "";
+  }
 }
 
 async function updateBadge(tabId) {
   if (!tabId) return;
   try {
-    const tab  = await chrome.tabs.get(tabId);
-    const host = tab?.url ? hostnameOf(tab.url) : '';
+    const tab = await chrome.tabs.get(tabId);
+    const host = tab?.url ? hostnameOf(tab.url) : "";
     const stored = await chrome.storage.sync.get({
       ...FACTORY_DEFAULTS,
       excludedSites: [],
-      siteProfiles: {},
+      siteProfiles: {}
     });
-
     const excludedSites = Array.isArray(stored.excludedSites) ? stored.excludedSites : [];
     if (host && hostInList(host, excludedSites)) {
-      await chrome.action.setBadgeText({ text: '–', tabId });
-      await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR_NEUTRAL, tabId });
+      await chrome.action.setBadgeText({
+        text: "–",
+        tabId: tabId
+      });
+      await chrome.action.setBadgeBackgroundColor({
+        color: BADGE_COLOR_NEUTRAL,
+        tabId: tabId
+      });
       return;
     }
-
-    const siteProfiles = (stored.siteProfiles && typeof stored.siteProfiles === 'object') ? stored.siteProfiles : {};
+    const siteProfiles = stored.siteProfiles && typeof stored.siteProfiles === "object" ? stored.siteProfiles : {};
     const profile = host ? findSiteProfile(host, siteProfiles) : null;
-    const effective = (profile && typeof profile === 'object') ? { ...stored, ...profile } : stored;
+    const effective = profile && typeof profile === "object" ? {
+      ...stored,
+      ...profile
+    } : stored;
     const active = Object.keys(FACTORY_DEFAULTS).filter(k => effective[k]).length;
-
-    await chrome.action.setBadgeText({ text: active > 0 ? String(active) : '', tabId });
-    await chrome.action.setBadgeBackgroundColor({
-      color: profile ? BADGE_COLOR_PROFILE : (active > 0 ? BADGE_COLOR_ACTIVE : BADGE_COLOR_NEUTRAL),
-      tabId,
+    await chrome.action.setBadgeText({
+      text: active > 0 ? String(active) : "",
+      tabId: tabId
     });
-  } catch (_) {
-    // Onglet introuvable (fermé entre-temps) ou page sans accès — rien à faire
-  }
+    await chrome.action.setBadgeBackgroundColor({
+      color: profile ? BADGE_COLOR_PROFILE : active > 0 ? BADGE_COLOR_ACTIVE : BADGE_COLOR_NEUTRAL,
+      tabId: tabId
+    });
+  } catch (_) {}
 }
 
 async function updateAllBadges() {
@@ -260,57 +270,55 @@ async function updateAllBadges() {
   } catch (_) {}
 }
 
-chrome.tabs.onActivated.addListener(({ tabId }) => updateBadge(tabId));
-// La navigation change le hostname de l'onglet (donc son éventuelle
-// exclusion/profil) sans forcément déclencher de changement de storage —
-// on réévalue le badge à chaque fin de chargement de page.
+chrome.tabs.onActivated.addListener(({tabId: tabId}) => updateBadge(tabId));
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.status === 'complete' || changeInfo.url) updateBadge(tabId);
+  if (changeInfo.status === "complete" || changeInfo.url) updateBadge(tabId);
 });
-// Le badge dépendant désormais de données par-onglet (exclusion, profil),
-// un changement de réglages peut affecter plusieurs onglets à la fois —
-// on réévalue donc tous les onglets plutôt que le seul onglet actif.
+
 chrome.storage.onChanged.addListener(() => updateAllBadges());
 
-// ── Raccourcis clavier (chrome.commands) ──────────────────────────
-// Les combinaisons par défaut sont des suggestions : si elles entrent en
-// conflit avec un raccourci déjà réservé par le navigateur, Chrome ne les
-// active simplement pas — l'utilisateur peut alors les réassigner depuis
-// chrome://extensions/shortcuts sans que cela affecte le reste de l'extension.
 chrome.commands.onCommand.addListener(async command => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  if (command === 'toggle-all') {
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true
+  });
+  if (command === "toggle-all") {
     try {
       const stored = await chrome.storage.sync.get(FACTORY_DEFAULTS);
       const anyOn = Object.keys(FACTORY_DEFAULTS).some(k => stored[k]);
       const next = {};
-      Object.keys(FACTORY_DEFAULTS).forEach(k => { next[k] = !anyOn; });
+      Object.keys(FACTORY_DEFAULTS).forEach(k => {
+        next[k] = !anyOn;
+      });
       await chrome.storage.sync.set(next);
-      // Application immédiate sur l'onglet actif (même schéma que le popup) ;
-      // les autres onglets ouverts reprendront le nouvel état à leur prochain
-      // chargement, ou via leur propre popup s'il est ouvert.
       if (tab?.id) {
-        try { await chrome.tabs.sendMessage(tab.id, { action: 'updateSettings', settings: next }); } catch (_) {}
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            action: "updateSettings",
+            settings: next
+          });
+        } catch (_) {}
       }
     } catch (_) {}
     return;
   }
-
-  if (command === 'toggle-site-exclusion') {
+  if (command === "toggle-site-exclusion") {
     if (!tab?.url) return;
-    let hostname = '';
-    try { hostname = new URL(tab.url).hostname; } catch (_) {}
+    let hostname = "";
+    try {
+      hostname = new URL(tab.url).hostname;
+    } catch (_) {}
     if (!hostname) return;
     try {
-      const { excludedSites } = await chrome.storage.sync.get({ excludedSites: [] });
+      const {excludedSites: excludedSites} = await chrome.storage.sync.get({
+        excludedSites: []
+      });
       const list = Array.isArray(excludedSites) ? excludedSites : [];
-      const next = hostInList(hostname, list)
-        ? list.filter(entry => !hostMatchesPattern(hostname, entry))
-        : [...new Set([...list, hostname])];
-      // content.js écoute déjà ce changement (storage.onChanged) dans chaque
-      // onglet concerné — aucun message direct à envoyer ici.
-      await chrome.storage.sync.set({ excludedSites: next });
+      const next = hostInList(hostname, list) ? list.filter(entry => !hostMatchesPattern(hostname, entry)) : [ ...new Set([ ...list, hostname ]) ];
+      await chrome.storage.sync.set({
+        excludedSites: next
+      });
     } catch (_) {}
   }
 });
